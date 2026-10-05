@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Deutsch-Abenteuer</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html,body{margin:0;height:100%;background:#1b1530;overflow:hidden;font-family:"Trebuchet MS",Verdana,sans-serif;touch-action:manipulation}
+[hidden]{display:none!important}
+#game{position:fixed;inset:0}
+#vg{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,rgba(10,5,30,0) 55%,rgba(10,5,30,.5) 100%)}
+#game canvas{image-rendering:pixelated}
+button{font:bold 20px inherit;font-family:inherit;min-height:56px;padding:8px 20px;border:4px solid #2b1d3a;border-radius:4px;background:#f4d35e;color:#2b1d3a;box-shadow:0 4px #2b1d3a,inset 0 -5px #d4b23c,inset 0 3px #fbe9a0;touch-action:manipulation}
+button:active{transform:translateY(3px);box-shadow:0 1px #2b1d3a}
+button.sec{background:#d9cfe8}button.ok{background:#8fd19e}button.bad{background:#f19a8f}
+#hud{position:fixed;top:0;left:0;right:0;display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:6px 10px;background:#2b1d3aee;border-bottom:4px solid #f4d35e;color:#fdf3d8;font-size:15px;pointer-events:none}
+#hud b{font:13px "Press Start 2P","Courier New",monospace;letter-spacing:1px;color:#f4d35e;text-shadow:2px 2px #000}
+#hud button{pointer-events:auto;min-height:40px;font-size:13px;padding:4px 10px;margin-left:6px}#hud #inv{margin-left:auto}
+#act{position:fixed;right:18px;bottom:24px;font-size:24px;min-height:72px;padding:10px 26px;background:#8fd19e}
+#find{position:fixed;top:56px;left:50%;transform:translateX(-50%);max-width:90%;background:#fdf3d8;border:3px solid #2b1d3a;border-radius:8px;padding:8px 14px;font-size:17px;text-align:center}
+#dlg{position:fixed;left:8px;right:8px;bottom:8px;margin:auto;max-width:880px;max-height:78vh;overflow:auto;background:#fdf3d8;border:4px solid #2b1d3a;border-radius:2px;padding:12px 16px;color:#2b1d3a;box-shadow:0 0 0 4px #f4d35e,0 0 0 8px #2b1d3a,inset 0 0 0 3px #e8d7a8}
+#top{display:flex;align-items:center;gap:12px}
+#pt{width:54px;height:78px;image-rendering:pixelated;background:#cfe8c0;border:3px solid #2b1d3a;border-radius:6px}
+#nm{font-size:22px}#tx{font-size:21px;line-height:1.4;margin:8px 0}
+#bd{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0}
+#bd button{flex:1 1 100%;text-align:left;font-weight:normal}
+#bd .card{flex:0 0 auto;min-width:64px;text-align:center}
+#ans{min-height:64px;width:100%;border:3px dashed #8a7aa8;border-radius:8px;padding:6px;display:flex;flex-wrap:wrap;gap:8px}
+textarea{width:100%;font:20px inherit;font-family:inherit;border:3px solid #2b1d3a;border-radius:8px;padding:8px;-webkit-user-select:text;user-select:text}
+#fb{font-size:20px;font-weight:bold;min-height:26px;margin:4px 0}
+#bt{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;margin-top:6px}
+body.m #act{display:none}
+</style></head><body>
+<div id="game"></div>
+<div id="vg"></div>
+<div id="hud"><b>DEUTSCH-ABENTEUER</b><span>Aufgabe: Beschreibe die Personen!</span><span id="xp"></span><span id="hp"></span><button id="inv">🎒 Wörter</button><button id="snd">🔊</button><button id="rst">Fortschritt zurücksetzen</button></div>
+<div id="find" hidden></div>
+<button id="act" hidden></button>
+<div id="dlg" hidden><div id="top"><canvas id="pt" width="36" height="52"></canvas><b id="nm"></b></div><p id="tx"></p><div id="bd"></div><div id="fb"></div><div id="bt"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+<script>
+// ========================================================================
+// TEACHER CONTENT 1: VOCABULARY FROM CLASS MATERIALS (unterrichtmitspass sheets)
+// Words and sentence patterns are taken from the worksheets, with their spelling.
+// ========================================================================
+const vocabularyBank = {
+  alter: ["jung", "erwachsen", "alt"],
+  koerperbau: ["schlank", "mollig", "dünn", "muskulös", "kurvig"],
+  gesicht: ["oval", "rund", "eckig", "die Augen", "der Mund", "die Ohren", "die Falten", "die Brille", "die Nase", "der Hals", "das Ohr", "die Sommersprossen", "der Schnurrbart", "die Zahnspange", "das Piercing"],
+  haare: ["lockig", "glatt", "wellig", "lang", "kurz", "schulterlang", "mittellang", "blond", "der Pony", "die Zöpfe"],
+  kleidung: ["das T-Shirt", "das Kleid", "die Hose", "der Rock", "das Hemd", "die Jacke", "die Schuhe", "der Pullover", "die Socken", "die Stiefel", "die Turnschuhe", "das Oberteil"],
+  haut: ["hell", "dunkel", "sehr dunkel"],
+  eigenschaften: ["sportlich", "elegant", "modisch", "bunt", "freundlich", "hübsch"],
+  groesse: ["klein", "mittelgroß", "groß"],
+  farben: ["braun", "schwarz", "rot", "blau", "grün", "gelb", "lila", "grau"],
+  tiere: ["die Katze", "das Huhn", "der Hase", "die Ente", "der Schmetterling", "der Vogel", "der Fisch"],
+  sentenceStarters: ["Er/Sie ist …", "Er/Sie trägt …", "Seine/Ihre Haare sind …", "Er/Sie hat eine … Figur.", "Auffallend ist/sind …", "Seine/Ihre Augen sind …"]
+};
+// Colour words -> pixel colours (add a word here to use it in the characters below)
+const colors = {blond:0xe8c547, braun:0x6b4423, schwarz:0x1c1c24, rot:0xc2452d, blau:0x3a6fd8, grün:0x3a9a4a, gelb:0xe8c93a, lila:0x8a4fc0, grau:0x808080, weiß:0xf0f0f0};
+
+// ========================================================================
+// TEACHER CONTENT 2: CHARACTERS AND EXERCISES  (edit this section freely)
+// tx/ty = map tile position. type: choice | build | find | free
+// xp = reward per task, gxp = reward for the grammar task (MAXXP is calculated automatically).
+// words / gwords = vocabulary cards (from vocabularyBank) collected into the inventory. gram = grammar blanks (___), c = index of the correct option. hair/eyes/shirt/trousers use colour words above.
+// ========================================================================
+const characters = [
+ { id:"mia", name:"Mia", fem:true, tx:10, ty:13, height:"groß", hair:"blond", hairLength:"lang", hairStyle:"glatt", eyes:"blau",
+   shirt:"rot", shirtType:"T-Shirt", trousers:"blau", acc:"", boots:false, xp:20, type:"choice",
+   dialogue:["Hallo! Ich heiße Mia.", "Beschreibe die Person. Schau mich genau an!"],
+   doneDialogue:["Danke! Das Tor zum Dorf ist jetzt offen."],
+   question:"Welche Haare hat Mia?",
+   answers:["Ihre Haare sind lang und blond.", "Ihre Haare sind kurz und schwarz.", "Ihre Haare sind lockig und rot."], correct:0,
+   wrong:"Nicht ganz. Schau dir Mia noch einmal an.",
+   words:["groß","blond","glatt","das T-Shirt","lang"], gwords:["rot","blau","die Hose","jung"], gxp:10,
+   gram:[{s:"Mia trägt ___ T-Shirt.",o:["ein rotes","eine rote","einen roten"],c:0},{s:"Sie trägt ___ Hose.",o:["ein blaues","eine blaue","einen blauen"],c:1}] },
+ { id:"ben", name:"Ben", fem:false, tx:25, ty:16, height:"klein", hair:"braun", hairLength:"kurz", hairStyle:"glatt", eyes:"grün",
+   shirt:"gelb", shirtType:"Jacke", trousers:"grau", acc:"Brille", boots:false, xp:20, type:"choice",
+   dialogue:["Hallo! Ich bin Ben.", "Welche Beschreibung passt zu mir? Achte auf Größe, Kleidung und Brille!"],
+   doneDialogue:["Super! Das war richtig. Danke für deine Hilfe!"],
+   question:"Welche Beschreibung passt zu Ben?",
+   answers:["Ben ist groß und hat blonde Haare.", "Ben ist klein und trägt eine gelbe Jacke. Er trägt eine Brille.", "Ben hat lange, schwarze Haare und ein grünes T-Shirt."], correct:1,
+   wrong:"Nicht ganz. Schau dir Ben noch einmal an.",
+   words:["klein","braun","kurz","die Jacke","die Brille"], gwords:["gelb","grau","dünn","der Mund"], gxp:10,
+   gram:[{s:"Ben trägt ___ Jacke.",o:["eine gelbe","einen gelben","ein gelbes"],c:0},{s:"Er trägt ___ Hose.",o:["einen grauen","eine graue","ein graues"],c:1}] },
+ { id:"aylin", name:"Aylin", fem:true, tx:31, ty:13, height:"mittelgroß", hair:"schwarz", hairLength:"lang", hairStyle:"glatt", eyes:"braun",
+   shirt:"grün", shirtType:"T-Shirt", trousers:"schwarz", acc:"", boots:false, xp:20, type:"build",
+   dialogue:["Hallo! Ich bin Aylin.", "Baue einen Satz über mich. Tippe auf die Wörter!"],
+   doneDialogue:["Prima Satz! Du kannst schon gut beschreiben."],
+   cards:["Ihre","Haare","sind","lang","und","schwarz","blond"], sentence:"Ihre Haare sind lang und schwarz",
+   words:["schwarz","schulterlang","die Augen","erwachsen","mittelgroß"], gwords:["grün","schlank","oval","die Schuhe"], gxp:10,
+   gram:[{h:"Tipp: Haare = Plural (mehrere), ohne Artikel. Die Adjektive enden auf -e.",s:"Aylin hat ___ Haare.",o:["lange schwarze","langen schwarzen","langes schwarzes"],c:0},{s:"Sie trägt ___ Hose.",o:["ein schwarzes","einen schwarzen","eine schwarze"],c:2}] },
+ { id:"theo", name:"Theo", fem:false, tx:40, ty:16, height:"groß", hair:"rot", hairLength:"kurz", hairStyle:"glatt", eyes:"braun",
+   shirt:"blau", shirtType:"Hemd", trousers:"braun", acc:"Hut", boots:true, xp:20, type:"find",
+   dialogue:["Hallo! Ich bin Theo.", "Ich suche meine Freundin. Hilfst du mir?"],
+   doneDialogue:["Danke! Jetzt habe ich sie gefunden."],
+   task:"Finde die Person mit den langen, schwarzen Haaren. Sie trägt ein grünes T-Shirt.", target:"aylin",
+   words:["rot","das Hemd","muskulös","eckig"], gwords:["die Ohren","wellig","alt","der Rock"], gxp:10,
+   gram:[{s:"Theo trägt ___ Hut.",o:["ein brauner","einen braunen","eine braune"],c:1},{s:"Er trägt ___ Hemd.",o:["ein blaues","einen blauen","eine blaue"],c:0}] },
+ { id:"nora", name:"Nora", fem:true, tx:54, ty:13, height:"klein", hair:"braun", hairLength:"mittel", hairStyle:"lockig", eyes:"blau",
+   shirt:"lila", shirtType:"Kleid", trousers:"lila", acc:"Brille", boots:false, xp:20, type:"free",
+   dialogue:["Hallo! Ich bin Nora.", "Beschreibe diese Person. Schreibe zwei bis vier Sätze."],
+   doneDialogue:["Wunderbar! Du bist ein Beschreibungs-Profi!"],
+   hint:"Tipp: Seine/Ihre Haare sind … / Ihre Augen sind … / Sie trägt … / Auffallend ist …",
+   keywords:[["haare","braun","lockig"],["augen","blau"],["kleid","lila"],["brille"],["klein"]], minGroups:3,
+   words:["lockig","lila","das Kleid","rund","mittellang"], gwords:["die Zöpfe","mollig","kurvig","die Falten"], gxp:10,
+   gram:[{h:"Tipp: Haare = Plural (mehrere), ohne Artikel. Die Adjektive enden auf -e.",s:"Nora hat ___ Haare.",o:["braune lockige","braunen lockigen","braunes lockiges"],c:0},{s:"Sie trägt ___ Brille.",o:["einen schwarzen","eine schwarze","ein schwarzes"],c:1}] }
+];
+// ========================================================================
+// TEACHER CONTENT 3: STORY QUEST "DER KRISTALLDIEB" (Markt + Schloss)
+// Story NPCs look like normal characters. Each STORY node: t = text, c = choices
+// ({t, go} = go to node; {t, bad} = wrong choice with feedback), task = free-writing task, ok = node after task.
+// Quest XP (30 + 10) is added to MAXXP in the engine below.
+// ========================================================================
+const storyNpcs = [
+ {id:"lena", name:"Lena", story:"lena", tx:15, ty:38, height:"mittelgroß", hair:"braun", hairLength:"lang", hairStyle:"glatt", eyes:"grün", shirt:"gelb", shirtType:"Kleid", trousers:"gelb", acc:"", boots:false},
+ {id:"koenigin", name:"Königin Rosa", story:"koenigin", tx:44, ty:36, height:"mittelgroß", hair:"grau", hairLength:"lang", hairStyle:"glatt", eyes:"blau", shirt:"lila", shirtType:"Kleid", trousers:"lila", acc:"", boots:false},
+ {id:"otto", name:"Einsiedler Otto", story:"otto", tx:41, ty:5, height:"mittelgroß", hair:"grau", hairLength:"kurz", hairStyle:"glatt", eyes:"braun", shirt:"braun", shirtType:"Jacke", trousers:"grau", acc:"Bart", boots:true},
+ {id:"greta", name:"Oma Greta", story:"greta", tx:6, ty:56, height:"klein", hair:"grau", hairLength:"kurz", hairStyle:"lockig", eyes:"blau", shirt:"rot", shirtType:"Jacke", trousers:"grau", acc:"Brille", boots:false},
+ {id:"hugo", name:"Bäcker Hugo", story:"hugo", tx:31, ty:56, height:"groß", hair:"braun", hairLength:"kurz", hairStyle:"glatt", eyes:"braun", shirt:"weiß", shirtType:"Hemd", trousers:"grau", acc:"Bart", boots:false},
+ {id:"tom", name:"Tom", story:"tom", tx:6, ty:70, height:"klein", hair:"blond", hairLength:"kurz", hairStyle:"glatt", eyes:"blau", shirt:"grün", shirtType:"T-Shirt", trousers:"blau", acc:"", boots:false},
+ {id:"mara", name:"Kräuterfrau Mara", story:"mara", tx:31, ty:70, height:"mittelgroß", hair:"rot", hairLength:"lang", hairStyle:"glatt", eyes:"grün", shirt:"braun", shirtType:"Kleid", trousers:"braun", acc:"", boots:true}];
+const TASKS = {
+ ben:()=>({title:"Beschreibe Ben für die Nachbarn.", hint:"Tipp: Er ist … / Er hat … Haare. / Er trägt …", keywords:[["klein"],["braun"],["gelb","jacke"],["brille"],["haare"]], minGroups:3}),
+ hugo:()=>({cards:["Sie","trägt","ein","lila","Kleid","eine"], sentence:"Sie trägt ein lila Kleid"}),
+ mara:()=>({title:"Beschreibe, was du heute trägst.", hint:"Tipp: Ich trage … / Heute trage ich …", keywords:[["trage"],[S.hero.shirt],[S.hero.trousers]], minGroups:2}),
+ queen:()=>({title:"Beschreibe die Königin für den Maler.", hint:"Tipp: Sie ist … / Ihre Haare sind … / Sie trägt …", keywords:[["grau"],["lang"],["blau"],["lila","kleid"],["haare","augen"]], minGroups:3}),
+ riddle:()=>({title:"Schreibe ein Rätsel: Wer bin ich?", hint:"Tipp: Verrate den Namen nicht! Er/Sie hat … Haare. Er/Sie trägt …", keywords:[["hat","ist"],["haare"],["trägt"],["augen","brille","hut","kleid","jacke","hose"]], minGroups:3}),
+ thief:()=>({title:"Beschreibe den Dieb für die Wache.", hint:"Tipp: Er ist … / Er hat … Haare. / Er trägt …", keywords:[["groß"],["rot"],["hut"],["hemd","blau"],["haare","kurz"]], minGroups:3}),
+ me:()=>({title:"Beschreibe dich selbst.", hint:"Tipp: Ich habe … Augen. / Meine Haare sind … / Ich trage …", keywords:[[S.hero.hair],[S.hero.eyes],[S.hero.shirt],[S.hero.len==="lang"?"lang":"kurz"],["ich"]], minGroups:3})};
+// Animal quests (free-writing tasks use the same keyword check as the other tasks)
+TASKS.kat=()=>({title:"Beschreibe Minka für den Zettel an der Tür.", hint:"Tipp: Minka ist … / Sie hat … / Ihr Fell ist …", keywords:[["klein"],["orange","rot","braun"],["katze","minka"],["schwanz","ohren","fell","augen","streifen"]], minGroups:3});
+TASKS.hase=()=>({title:"Beschreibe den Hasen für Otto.", hint:"Tipp: Der Hase ist … / Er hat … Ohren. / Sein Fell ist …", keywords:[["hase"],["klein"],["braun","grau","beige"],["ohren","fell","schwanz","augen"]], minGroups:3});
+const STORY = {
+ lena:{ start:()=>!S.me?"m":S.q.s===0?"h":S.q.s===1?"w":S.q.s===2?"x":"y", nodes:{
+  m:{t:"Willkommen auf dem Markt, {h}! Ich kenne dich noch nicht. Wie siehst du aus?", task:"me", ok:"m2"},
+  m2:{t:"Toll! Jetzt kenne ich dich. ⭐ +10 XP", f:()=>{S.me=1;gain(10);}},
+  h:{t:"Frische Äpfel und Brot! Man sagt: Im Wald lebt ein Einsiedler. Er wohnt nicht an der Straße. Such einen Weg zwischen den Bäumen!"},
+  w:{t:"Der Dieb ist weggelaufen! Er ist groß. Er hat kurze, rote Haare. Er trägt einen Hut und ein blaues Hemd. Wer war es?", c:[
+     {t:"Es war Mia.", bad:"Nein. Mia hat blonde Haare. Der Dieb hat rote Haare."},
+     {t:"Es war Ben.", bad:"Nein. Ben ist klein und trägt eine Brille. Der Dieb ist groß."},
+     {t:"Es war Theo.", go:"w2", f:()=>{S.q.s=2;save();}}]},
+  w2:{t:"Ja, genau! Das war Theo. Gehe jetzt zur Königin ins Schloss und beschreibe den Dieb."},
+  x:{t:"Geh zur Königin ins Schloss und beschreibe den Dieb!"},
+  y:{t:"Die Königin ist froh. Danke, {h}! Hast du den Einsiedler im Wald schon gefunden? Such einen Weg zwischen den Bäumen."}}},
+ koenigin:{ start:()=>S.q.s<3?["a","w","f"][S.q.s]:(!S.q.p?"p":!S.q.c?(S.inv.length>=25?"c":"cw"):"z"), nodes:{
+  a:{t:"Hilfe, {h}! Mein Kristall ist weg! Ein Dieb war hier. Hilfst du mir?", c:[
+     {t:"Ja, ich helfe dir!", go:"a2", f:()=>{S.q.s=1;save();}}, {t:"Später. Ich muss noch üben.", go:"a3"}]},
+  a2:{t:"Danke! Frag Lena auf dem Markt. Sie hat den Dieb gesehen. Höre genau zu!"},
+  a3:{t:"Gut. Komm bald wieder!"},
+  w:{t:"Hast du schon mit Lena gesprochen? Sie steht auf dem Markt."},
+  f:{t:"Du kennst den Dieb! Beschreibe ihn für meine Wache.", task:"thief", ok:"e"},
+  e:{t:"Wunderbar! Du hast den Dieb genau beschrieben. Was soll mit ihm passieren?", c:[
+     {t:"Er soll sich entschuldigen.", go:"e1", f:()=>fin(1)}, {t:"Er soll uns helfen.", go:"e2", f:()=>fin(2)}]},
+  e1:{t:()=>"Theo bringt den Kristall zurück und sagt: Entschuldigung! ⭐ +30 XP"+(S.xp>=MAXXP?"<br><b>Du hast gewonnen! 🏆</b>":"")},
+  e2:{t:()=>"Theo hilft jetzt im Schloss. Der Kristall leuchtet wieder! ⭐ +30 XP"+(S.xp>=MAXXP?"<br><b>Du hast gewonnen! 🏆</b>":"")},
+  z:{t:"Danke, {h}! Das Schloss ist wieder sicher."},
+  p:{t:"Eine Bitte noch: Ein Maler malt mein Porträt. Beschreibe mich!", task:"queen", ok:"p2"},
+  p2:{t:"Danke! Das Bild wird schön. ⭐ +15 XP", f:()=>{S.q.p=1;gain(15);}},
+  cw:{t:()=>"Ich sammle Wörter! Du hast "+S.inv.length+" von 25 🎒. Suche in Truhen und Büchern – auch im Wald und im Garten!"},
+  c:{t:"Du hast 25 Wörter! Du bist ein Wortmeister! ⭐ +20 XP", f:()=>{S.q.c=1;gain(20);}}}},
+ greta:{ start:()=>!S.q.g?"a":!S.q.k?"k":S.q.k===1?"k2":S.q.k===2?"kd":"z", nodes:{
+  k:{t:"Ach, {h}, noch ein Problem! Meine Katze Minka ist weggelaufen. Sie ist klein und orange. Hilfst du mir?", c:[
+     {t:"Ja, ich suche Minka!", go:"k1", f:()=>{S.q.k=1;save();}}, {t:"Später.", go:"k0"}]},
+  k0:{t:"Bitte komm bald wieder. Minka ist klein und orange."},
+  k1:{t:"Danke! Such Minka im Dorf. Tippe auf die Katze, wenn du sie siehst."},
+  k2:{t:"Hast du Minka schon gefunden? Sie ist klein und orange. Such im Dorf und tippe auf die Katze."},
+  kd:{t:"Minka ist wieder da! Beschreibe sie für den Zettel an der Tür.", task:"kat", ok:"kb"},
+  kb:{t:"Danke! Jetzt kennt jeder Minka. ⭐ +15 XP", f:()=>{S.q.k=3;gain(15);}},
+  a:{t:"Guten Tag, {h}! Ich suche meinen Enkel Ben. Er ist weggelaufen. Beschreibe Ben für die Nachbarn!", task:"ben", ok:"b"},
+  b:{t:"Danke! Jetzt finden ihn alle. ⭐ +10 XP", f:()=>{S.q.g=1;gain(10);}},
+  z:{t:"Ben ist wieder zu Hause. Danke, {h}!"}}},
+ hugo:{ start:()=>!S.q.h?"a":!S.q.d?"d":"z", nodes:{
+  d:{t:"Ein kleiner Gast kommt jeden Tag in meine Bäckerei. Es ist ein Haustier. Es hat ein weiches Fell, fängt Mäuse und miaut. Wer ist es?", c:[
+     {t:"Die Katze", go:"d2"}, {t:"Das Huhn", bad:"Nein. Das Huhn miaut nicht."}, {t:"Die Ente", bad:"Nein. Die Ente hat kein Fell."}]},
+  d2:{t:"Richtig, die Katze! Danke, {h}! ⭐ +10 XP und das Wort „die Katze“ 🎒", f:()=>{S.q.d=1;awardWords(["die Katze"]);gain(10);}},
+  a:{t:"Frisches Brot! Meine Kundin kommt gleich. Sie trägt ein lila Kleid. Baue den Satz!", task:"hugo", ok:"b"},
+  b:{t:"Perfekt! Ein Brot für dich. ⭐ +10 XP", f:()=>{S.q.h=1;gain(10);}},
+  z:{t:"Das Brot ist noch warm. Schönen Tag, {h}!"}}},
+ tom:{ start:()=>!S.q.t?"a":"z", nodes:{
+  a:{t:"Hallo! Ich bin Tom. Ich suche meine Schwester. Sie hat lange, schwarze Haare und trägt ein grünes T-Shirt. Wer ist es?", c:[
+     {t:"Mia", bad:"Nein. Mia hat blonde Haare."}, {t:"Aylin", go:"b"}, {t:"Nora", bad:"Nein. Nora ist klein und hat lockige Haare."}]},
+  b:{t:"Genau, Aylin! Danke, {h}! ⭐ +10 XP", f:()=>{S.q.t=1;gain(10);}},
+  z:{t:"Meine Schwester ist die Beste!"}}},
+ mara:{ start:()=>!S.q.m?"a":"z", nodes:{
+  a:{t:"Ich sammle Kräuter im Wald. Heute trage ich Stiefel! Und du? Schreibe: Ich trage …", task:"mara", ok:"b"},
+  b:{t:"Sehr schön! Der Wald ist kalt, trag eine Jacke. ⭐ +10 XP", f:()=>{S.q.m=1;gain(10);}},
+  z:{t:"Pass im Wald gut auf, {h}."}}},
+ otto:{ start:()=>!S.q.o?"a":S.q.o===1?"w":!S.q.r?"r":S.q.r===1?"r2":S.q.r===2?"rd":"z", nodes:{
+  r:{t:"Noch eine Bitte, {h}. Ich sehe schlecht. Im Wald lebt ein Hase. Tippe auf den Hasen und erzähle mir, wie er aussieht!", c:[
+     {t:"Gern!", go:"r1", f:()=>{S.q.r=1;save();}}, {t:"Später.", go:"r0"}]},
+  r0:{t:"Komm wieder, wenn du Zeit hast. Der Hase wohnt im Wald."},
+  r1:{t:"Danke! Such den Hasen im Wald und tippe auf ihn."},
+  r2:{t:"Hast du den Hasen schon gesehen? Er hüpft im Wald, nicht auf dem Weg."},
+  rd:{t:"Du hast den Hasen gesehen? Beschreibe ihn für mich!", task:"hase", ok:"r3"},
+  r3:{t:"Jetzt sehe ich ihn vor mir. Danke, {h}! ⭐ +15 XP", f:()=>{S.q.r=3;gain(15);}},
+  a:{t:"Oh, ein Besucher! Nur wenige finden mich hier im Wald. Ich sehe schlecht. Hilfst du mir bei drei Rätseln? Rätsel 1: Wer ist klein, hat kurze, braune Haare und trägt eine gelbe Jacke?", c:[
+     {t:"Mia", bad:"Nein. Mia ist groß."}, {t:"Ben", go:"b"}, {t:"Nora", bad:"Nein. Nora trägt ein lila Kleid."}]},
+  b:{t:"Richtig! Rätsel 2: Sie ist klein. Sie hat lockige, braune Haare. Sie trägt eine Brille und ein lila Kleid.", c:[
+     {t:"Aylin", bad:"Nein. Aylin hat lange, schwarze Haare."}, {t:"Nora", go:"c"}, {t:"Mia", bad:"Nein. Mia hat lange, blonde Haare."}]},
+  c:{t:"Richtig! Rätsel 3: Sie ist groß. Sie hat lange, blonde Haare und trägt ein rotes T-Shirt.", c:[
+     {t:"Mia", go:"d"}, {t:"Aylin", bad:"Nein. Aylin hat schwarze Haare."}, {t:"Nora", bad:"Nein. Nora ist klein."}]},
+  d:{t:"Super! Alle Rätsel gelöst. Danke, {h}! ⭐ +20 XP und das Wort „freundlich“ 🎒", f:()=>{S.q.o=1;awardWords(["freundlich"]);gain(20);}},
+  w:{t:"Jetzt bist du dran! Schreibe ein Rätsel über eine Person. Verrate den Namen nicht!", task:"riddle", ok:"w2"},
+  w2:{t:"Ein tolles Rätsel! ⭐ +15 XP", f:()=>{S.q.o=2;gain(15);}},
+  z:{t:"Danke für deine Hilfe, {h}. Im Wald ist es schön ruhig."}}}};
+// ========================================================================
+// TEACHER CONTENT 4: ANIMALS - tap an animal to learn its word (saved in the inventory)
+// key = sprite name used in the game; word must exist in vocabularyBank.tiere; snd = sound effect name
+// ========================================================================
+const animals = {
+ cat:{word:"die Katze", sent:"Die Katze ist klein und orange. Sie hat einen langen Schwanz.", snd:"meow"},
+ hen:{word:"das Huhn", sent:"Das Huhn ist weiß. Es hat einen roten Kamm.", snd:"cluck"},
+ rabbit:{word:"der Hase", sent:"Der Hase ist klein und braun. Er hat lange Ohren.", snd:"squeak"},
+ duck:{word:"die Ente", sent:"Die Ente schwimmt im Teich. Ihr Kopf ist grün.", snd:"quack"},
+ butterfly:{word:"der Schmetterling", sent:"Der Schmetterling ist bunt und leicht.", snd:"soft"},
+ bird:{word:"der Vogel", sent:"Der Vogel ist schwarz. Er fliegt hoch.", snd:"chirp"},
+ fish:{word:"der Fisch", sent:"Der Fisch ist blau. Er schwimmt im Wasser.", snd:"plop"}};
+// Hero creator options (colour words must exist in `colors`)
+const HERO_OPT = {hair:["blond","braun","schwarz","rot"], len:["kurz","lang"], eyes:["blau","grün","braun"], shirt:["rot","blau","grün","gelb","lila"], trousers:["blau","grau","schwarz","braun"]};
+const HERO_LBL = {hair:"Haarfarbe", len:"Haare", eyes:"Augen", shirt:"Oberteil", trousers:"Hose"};
+// Locked gates: need = number of finished tasks required. x = map column.
+const gates = [
+ {x:17, need:1, msg:"Das Tor zum Dorf ist offen!"},
+ {x:35, need:2, msg:"Der Weg in den Wald ist offen!"},
+ {x:47, need:3, msg:"Die Brücke ist repariert!"}];
+const signs = [
+ {tx:4, ty:13, text:"Willkommen! Beschreibe die Person von Kopf bis Fuß. Schreibe im Präsens!"},
+ {tx:21, ty:13, text:"Satzanfänge: " + vocabularyBank.sentenceStarters.join(" / ")}];
+// Places to find new words: icon "chest" (🎒 Öffnen) or "book" (📜 Lesen). words must exist in vocabularyBank.
+const finds = [
+ {tx:12, ty:20, icon:"chest", title:"Schatztruhe", text:"Du hast eine Truhe gefunden! Öffne 🎒 Wörter, um deine Sammlung zu sehen.", words:["der Pony","die Nase"]},
+ {tx:6, ty:5, icon:"bottle", water:true, title:"Flaschenpost", text:"Ein Zettel in der Flasche: Die Haut kann hell oder dunkel sein.", words:["hell","dunkel"]},
+ {tx:40, ty:18, icon:"chest", title:"Waldtruhe", text:"Am Waldrand steht eine alte Truhe.", words:["der Hals","das Ohr","die Sommersprossen"]},
+ {tx:25, ty:37, icon:"chest", title:"Marktkiste", text:"Eine Kiste voller Kleidung!", words:["der Pullover","die Socken"]},
+ {tx:3,  ty:46, icon:"book",  title:"Marktbuch", text:"Im Buch steht: Sie trägt ein buntes Kleid.", words:["bunt"]},
+ {tx:33, ty:40, icon:"book",  title:"Schlossbuch", text:"Ein altes Bild: Der König hat einen grauen Schnurrbart. Die Prinzessin hat eine Zahnspange.", words:["der Schnurrbart","die Zahnspange"]},
+ {tx:36, ty:34, icon:"book",  title:"Bibliothek", text:"Ein Buch über Gesichter: Das Piercing ist modisch. Die Haut ist sehr dunkel.", words:["das Piercing","sehr dunkel","modisch"]},
+ {tx:54, ty:46, icon:"chest", title:"Königstruhe", text:"Eine goldene Truhe mit eleganter Kleidung.", words:["die Stiefel","das Oberteil","elegant"]},
+ {tx:57, ty:26, icon:"chest", title:"Gartentruhe", text:"Eine Truhe im Schlossgarten.", words:["sportlich"]},
+ {tx:39, ty:7,  icon:"chest", title:"Einsiedlers Kiste", text:"Du hast das Versteck gefunden! In der Kiste liegen Schuhe.", words:["die Turnschuhe","hübsch"]}];
+const catNames = {alter:"Alter", koerperbau:"Körperbau", gesicht:"Gesicht", haare:"Haare", kleidung:"Kleidung", groesse:"Größe", farben:"Farben", haut:"Haut", eigenschaften:"Eigenschaften", tiere:"Tiere"};
+const LOCKED_MSG = "Dieser Weg ist noch verschlossen. Löse zuerst weitere Aufgaben!";
+// ========================================================================
+// ENGINE (you normally do not need to edit below this line)
+// ========================================================================
+const T=16, W=60, H=77, SPD=70, MAXXP=characters.reduce((s,c)=>s+c.xp+(c.gxp||0),0)+200, KEY="deutschAbenteuerV1";
+const BLK=[2,3,4,5,6,9,10,11,12,13,14,17,18,21,22,23,24,25,26,27,28,29,30,31,32,33,34,41,42,43]; // blocked tile types
+const $=id=>document.getElementById(id);
+let S; try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+S=S||{xp:0,done:{}}; S.gram=S.gram||{}; S.inv=S.inv||[]; S.q=S.q||{s:0}; S.seen=S.seen||{};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const doneCount=()=>Object.keys(S.done).length;
+// ---- Sound: tiny synthesized effects (no files). S.mute is saved. ----
+let AC=null;
+function unlockAudio(){ try{ if(!AC){const C=window.AudioContext||window.webkitAudioContext; if(C)AC=new C();} if(AC&&AC.state==="suspended")AC.resume(); }catch(e){} }
+function tone(f0,f1,dur,type,vol,delay){ if(S.mute||!AC)return; const t=AC.currentTime+(delay||0), o=AC.createOscillator(), g=AC.createGain();
+  o.type=type; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(Math.max(1,f1),t+dur);
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+Math.min(.02,dur/3)); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t+dur+.03); }
+function noise(dur,vol,cutoff){ if(S.mute||!AC)return; const t=AC.currentTime, n=Math.max(1,(AC.sampleRate*dur)|0), b=AC.createBuffer(1,n,AC.sampleRate), d=b.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=Math.random()*2-1; const s=AC.createBufferSource(), f=AC.createBiquadFilter(), g=AC.createGain();
+  f.type="lowpass"; f.frequency.value=cutoff; s.buffer=b; g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  s.connect(f); f.connect(g); g.connect(AC.destination); s.start(t); }
+const SFX={
+  step:()=>noise(.06,.05,700),
+  plop:v=>tone(700,260,.14,"sine",.07*v),
+  chirp:v=>{tone(2600,3400,.07,"sine",.03*v);tone(3000,3800,.07,"sine",.03*v,.1);tone(2800,3600,.06,"sine",.025*v,.2);},
+  meow:()=>{tone(520,880,.18,"triangle",.06);tone(880,500,.22,"triangle",.05,.16);},
+  cluck:()=>{tone(320,220,.07,"square",.025);tone(300,200,.07,"square",.025,.11);},
+  squeak:()=>tone(1400,1900,.09,"sine",.04),
+  quack:()=>{tone(420,300,.12,"sawtooth",.03);tone(400,280,.12,"sawtooth",.03,.17);},
+  soft:()=>tone(900,1100,.1,"sine",.025),
+  ding:()=>{tone(880,1320,.15,"sine",.06);tone(1320,1760,.18,"sine",.05,.12);}};
+function sfx(name,v){ if(S.mute||!AC)return; try{ (SFX[name]||function(){})(v==null?1:v); }catch(e){} }
+let modal=false, finding=null, hearts=3, scene, grid=[], solid=new Set(), path=[], cur=null;
+
+function hud(){ $("snd").textContent=S.mute?"🔇":"🔊"; $("xp").textContent="XP: "+S.xp+" / "+MAXXP; $("hp").textContent="❤️".repeat(hearts)+"🤍".repeat(3-hearts); }
+const btn=(t,f,c)=>{const b=document.createElement("button");b.textContent=t;b.onclick=f;if(c)b.className=c;return b;};
+function show(name,text,btns,body,id){
+  modal=true; document.body.classList.add("m"); $("dlg").hidden=false; $("nm").textContent=name||"";
+  $("top").hidden=!name; $("tx").innerHTML=(text||"").replace(/\{h\}/g,S.hero?S.hero.name:""); $("fb").textContent="";
+  $("bd").replaceChildren(...(body||[])); $("bt").replaceChildren(...btns.filter(Boolean).map(b=>btn(b.t,b.f,b.c)));
+  if(id){const c=$("pt").getContext("2d");c.clearRect(0,0,36,52);c.drawImage(scene.textures.get("c_"+id).getSourceImage(),0,0);}
+}
+function close(){ modal=false; document.body.classList.remove("m"); $("dlg").hidden=true; }
+const say=(name,text)=>show(name,text,[{t:"Schließen",f:close}]);
+const fb=(t,ok)=>{$("fb").textContent=t;$("fb").style.color=ok?"#1d7a3a":"#b03a2e";};
+const wrong=()=>{hearts=Math.max(1,hearts-1);hud();};
+const shuffle=a=>a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(p=>p[1]);
+
+// ---- Animals: tap one to learn its word ----
+const critHit=(c,wx,wy)=>{const b=c.s.getBounds(); return wx>=b.x-8&&wx<=b.right+8&&wy>=b.y-8&&wy<=b.bottom+8;};
+function tapAnimal(k){
+  const a=animals[k]; if(!a)return;
+  sfx(a.snd);
+  const nw=awardWords([a.word]); S.seen[k]=1;
+  let extra=nw.length?"<br>🎒 Neues Wort: "+a.word:"";
+  if(k==="cat"&&S.q.k===1){S.q.k=2;extra+="<br>🔎 Das ist Minka, die Katze von Oma Greta! Geh zu ihr zurück.";}
+  if(k==="rabbit"&&S.q.r===1){S.q.r=2;extra+="<br>🔎 Du hast den Hasen genau angeschaut. Erzähle Otto davon!";}
+  const total=Object.keys(animals).length, got=Object.keys(S.seen).filter(x=>animals[x]).length;
+  extra+="<br>🐾 Tiere entdeckt: "+got+" / "+total;
+  if(got===total&&!S.q.zoo){S.q.zoo=1;gain(10);extra+="<br>⭐ +10 XP – du kennst alle Tiere!";}
+  save();
+  if(S.xp>=MAXXP) extra+="<br><b>Du hast gewonnen! 🏆</b>";
+  say("","<b>"+a.word+"</b><br>"+a.sent+extra);
+}
+// ---- Dialogue: lines with Zurück / Weiter, then the exercise ----
+function talk(n){
+  const L=S.done[n.id]?n.doneDialogue:n.dialogue; let i=0;
+  const step=()=>{const last=i===L.length-1, done=S.done[n.id], gr=done&&!S.gram[n.id];
+    show(n.name,L[i],[ i>0&&{t:"Zurück",f:()=>{i--;step();},c:"sec"},
+      {t:last&&done?(gr?"Grammatik-Aufgabe":"Schließen"):"Weiter",f:()=>{ if(!last){i++;step();} else if(gr) exGram(n); else if(done) close(); else exercise(n);}},
+      !(last&&done&&!gr)&&{t:"Schließen",f:close,c:"sec"} ],null,n.id);};
+  step();
+}
+function exercise(n){ hearts=3; hud(); ({choice:exChoice,build:exBuild,find:exFind,free:exFree})[n.type](n); }
+const closeBtn={t:"Schließen",f:close,c:"sec"};
+
+// Exercise A/C: multiple choice (big answer buttons)
+function exChoice(n){
+  const body=shuffle(n.answers.map((a,i)=>[a,i])).map(([a,i])=>{
+    const b=btn(a,()=>{ if(i===n.correct){fb("Richtig! ⭐",true);b.className="ok";[...$("bd").children].forEach(x=>x.disabled=true);
+        $("bt").replaceChildren(btn("Weiter",()=>complete(n)));}
+      else{fb(n.wrong+" Noch einmal versuchen!",false);b.className="bad";b.disabled=true;wrong();}});
+    return b;});
+  show(n.name,"<b>"+n.question+"</b>",[closeBtn],body,n.id);
+}
+// Exercise B: build a sentence by tapping word cards (tap again to remove)
+function exBuild(n){
+  const cards=shuffle(n.cards), sel=[], ans=document.createElement("div"); ans.id="ans";
+  const row=document.createElement("div"); row.style.cssText="display:flex;flex-wrap:wrap;gap:8px;width:100%";
+  const draw=()=>{ ans.replaceChildren(...sel.map(i=>btn(cards[i],()=>{sel.splice(sel.indexOf(i),1);draw();},"card ok")));
+    row.replaceChildren(...cards.map((w,i)=>sel.includes(i)?null:btn(w,()=>{sel.push(i);draw();},"card")).filter(Boolean)); };
+  draw();
+  show(n.name,"<b>Ordne die Wörter. Schreibe Sätze!</b>",[
+    {t:"Zurücksetzen",f:()=>{sel.length=0;draw();fb("",1);},c:"sec"},
+    {t:"Satz prüfen",f:()=>{ if(sel.map(i=>cards[i]).join(" ")===n.sentence){fb("Richtig! ⭐",true);$("bt").replaceChildren(btn("Weiter",()=>(n.onOk||complete)(n)));}
+      else{fb("Fast! Probiere es noch einmal. Der Satz beginnt mit „"+n.sentence.split(" ")[0]+"“.",false);wrong();}}},closeBtn],[ans,row],n.id);
+}
+// Exercise D: find the described person on the map and tap them
+function exFind(n){
+  show(n.name,"<b>"+n.task+"</b><br>Tippe auf die richtige Person auf der Karte.",[{t:"Los geht’s",f:()=>{close();finding=n;
+    $("find").hidden=false;$("find").innerHTML=n.task+" <button class='sec' id='fx' style='min-height:36px;font-size:14px;padding:2px 10px'>Abbrechen</button>";
+    $("fx").onclick=()=>{finding=null;$("find").hidden=true;};}},closeBtn],null,n.id);
+}
+// Exercise E: free description, simple keyword check
+function exFree(n){
+  const ta=document.createElement("textarea"); ta.rows=4; ta.placeholder="Schreibe hier …";
+  show(n.name,"<b>"+(n.title||"Beschreibe diese Person.")+"</b><br><small>"+n.hint+"</small>",[closeBtn,{t:"Antwort prüfen",f:()=>{
+    const tk=ta.value.toLowerCase().match(/[a-zäöüß]+/g)||[], hit=n.keywords.filter(g=>g.some(w=>tk.some(x=>x.startsWith(w.toLowerCase())))).length;
+    if(hit>=n.minGroups){fb("Sehr gut! Du hast wichtige Wörter benutzt.",true);$("bt").replaceChildren(btn("Weiter",()=>(n.onOk||complete)(n)));}
+    else{fb("Gut versucht. Schau noch einmal auf Haare, Augen und Kleidung.",false);wrong();}}}],[ta],n.id);
+}
+// Level 2: grammar blanks (Ergänze) - adjective endings (Akkusativ after ein/eine/einen, or plural without article; optional h:"…" = custom hint)
+function exGram(n){
+  hearts=3; hud(); let i=0;
+  const go=()=>{ const q=n.gram[i];
+    const body=shuffle(q.o.map((a,k)=>[a,k])).map(([a,k])=>{ const b=btn(a,()=>{
+      if(k===q.c){fb("Richtig! ⭐",true);b.className="ok";[...$("bd").children].forEach(x=>x.disabled=true);
+        $("bt").replaceChildren(btn("Weiter",()=>{ if(++i<n.gram.length)go(); else complete(n,true); }));}
+      else{fb("Nicht ganz. "+(q.h||"Tipp: der → einen, die → eine, das → ein.")+" Noch einmal versuchen!",false);b.className="bad";b.disabled=true;wrong();}}); return b;});
+    show(n.name,"<b>Ergänze.</b> ("+(i+1)+"/"+n.gram.length+")<br>"+q.s.replace("___","<u>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</u>"),[closeBtn],body,n.id); };
+  go();
+}
+// Inventory: collected vocabulary words become cards
+function awardWords(list){const nw=(list||[]).filter(w=>!S.inv.includes(w));S.inv.push(...nw);if(nw.length)sfx("ding");return nw;}
+function openInv(){
+  if(modal)return; let tot=0,got=0;
+  const body=Object.keys(vocabularyBank).filter(k=>k!=="sentenceStarters").map(k=>{
+    const row=document.createElement("div"); row.style.cssText="display:flex;flex-wrap:wrap;gap:6px;width:100%;align-items:center";
+    const l=document.createElement("b"); l.textContent=catNames[k]+":"; row.append(l);
+    vocabularyBank[k].forEach(w=>{tot++;const h=S.inv.includes(w);if(h)got++;const c=document.createElement("span");c.textContent=h?w:"❓";
+      c.style.cssText="padding:4px 10px;border:2px solid #2b1d3a;border-radius:6px;font-size:17px;background:"+(h?"#8fd19e":"#d9cfe8");row.append(c);});
+    return row;});
+  show("","<b>🎒 Meine Wörter: "+got+" / "+tot+"</b>",[{t:"Schließen",f:close}],body);
+}
+function complete(n,g){
+  const box=g?S.gram:S.done, first=!box[n.id]; let nw=[];
+  if(first){box[n.id]=1;S.xp=Math.min(MAXXP,S.xp+(g?n.gxp:n.xp));nw=awardWords(g?n.gwords:n.words);} save(); hud(); scene.refreshGates();
+  let extra=""; if(first&&!g) gates.filter(g=>g.need===doneCount()).forEach(g=>extra+="<br>Neue Aufgabe! "+g.msg);
+  if(nw.length) extra+="<br>🎒 Neue Wörter: "+nw.join(", ");
+  if(S.xp>=MAXXP) extra+="<br><b>Du hast gewonnen! 🏆</b>";
+  show(n.name,"<b>Aufgabe geschafft!</b><br>⭐ +"+(first?(g?n.gxp:n.xp):0)+" XP"+extra,[{t:"Weitergehen",f:close}],null,n.id);
+}
+function toast(t){const f=$("find");f.hidden=false;f.textContent=t;setTimeout(()=>{if(finding)exFindBanner();else f.hidden=true;},2200);}
+function exFindBanner(){const f=$("find");f.innerHTML=finding.task+" <button class='sec' id='fx' style='min-height:36px;font-size:14px;padding:2px 10px'>Abbrechen</button>";$("fx").onclick=()=>{finding=null;f.hidden=true;};}
+
+const gain=x=>{S.xp=Math.min(MAXXP,S.xp+x);hud();save();};
+const fin=k=>{S.q.s=3;S.q.end=k;gain(30);};
+function story(n,id,key){
+  const nd=STORY[id].nodes[key||STORY[id].start()];
+  if(nd.task){const tk=TASKS[nd.task](); (tk.cards?exBuild:exFree)({...tk,name:n.name,id:n.id,onOk:()=>story(n,id,nd.ok)});return;}
+  if(nd.f)nd.f();
+  const body=(nd.c||[]).map(c=>{const b=btn(c.t,()=>{ if(c.bad){fb(c.bad+" Noch einmal versuchen!",false);b.className="bad";b.disabled=true;return;} if(c.f)c.f(); story(n,id,c.go);});return b;});
+  show(n.name,(typeof nd.t==="function"?nd.t():nd.t)+(nd.f&&S.xp>=MAXXP?"<br><b>Du hast gewonnen! 🏆</b>":""),[closeBtn],body,n.id);
+}
+// The student creates their own hero (name + looks), shown in the dialogue box
+function openCreator(){
+  const h=S.hero||{hair:"braun",len:"kurz",eyes:"braun",shirt:"blau",trousers:"grau",name:""}; S.hero=h;
+  const inp=document.createElement("input"); inp.placeholder="Dein Name"; inp.value=h.name; inp.maxLength=12;
+  inp.style.cssText="font:22px inherit;font-family:inherit;padding:8px;border:3px solid #2b1d3a;border-radius:8px;width:100%;-webkit-user-select:text;user-select:text";
+  const prev=()=>{makeHero(scene);const c=$("pt").getContext("2d");c.clearRect(0,0,36,52);c.drawImage(scene.textures.get("h_d0").getSourceImage(),0,0);};
+  const body=[inp]; Object.keys(HERO_OPT).forEach(k=>{
+    const row=document.createElement("div"); row.style.cssText="display:flex;flex-wrap:wrap;gap:8px;width:100%;align-items:center";
+    const l=document.createElement("b"); l.textContent=HERO_LBL[k]+":"; l.style.minWidth="110px"; row.append(l);
+    const bs=HERO_OPT[k].map(v=>{const b=btn(v,()=>{h[k]=v;bs.forEach(x=>x.className="card"+(x===b?" ok":""));prev();});b.className="card"+(h[k]===v?" ok":"");b.style.cssText="min-height:44px;font-size:17px";return b;});
+    row.append(...bs); body.push(row);});
+  show("Dein Held","<b>Erstelle deine Figur!</b> Wie siehst du aus?",[{t:"Fertig",f:()=>{h.name=inp.value.trim().replace(/[<>&]/g,"")||"Held";save();close();say("Abenteuer","Willkommen, {h}! Tippe auf die Karte, um zu laufen.");}}],body);
+  prev();
+}
+function interact(o){
+  if(o.kind==="npc") o.n.story?story(o.n,o.n.story):talk(o.n);
+  else if(o.kind==="sign") say("Schild",o.text);
+  else{const nw=awardWords(o.f.words);save();say(o.f.title,o.f.text+(nw.length?"<br>🎒 Neue Wörter: "+nw.join(", "):""));}
+}
+// Tap-only game: movement happens by tapping the map (no d-pad, no keyboard)
+$("act").onclick=()=>{if(cur&&!modal)interact(cur);};
+$("inv").onclick=openInv;
+$("snd").onclick=()=>{unlockAudio();S.mute=!S.mute;save();hud();sfx("ding");};
+["pointerdown","pointerup","click","touchend"].forEach(ev=>window.addEventListener(ev,unlockAudio));
+$("rst").onclick=()=>{ if(!modal) show("","Möchtest du wirklich deinen Fortschritt zurücksetzen?",[
+  {t:"Ja, zurücksetzen",f:()=>{try{localStorage.removeItem(KEY);}catch(e){} location.reload();},c:"bad"},{t:"Abbrechen",f:close,c:"sec"}]); };
+
+// ---- Pixel graphics generated in code ----
+const K=2; // texture resolution: art is drawn in 16px units, rendered at K x detail
+let OFF=0; // pixel offset used while drawing outlined sprites
+const R=(g,c,x,y,w,h)=>g.fillStyle(c).fillRect((x+OFF)*K,(y+OFF)*K,w*K,h*K);
+const shade=(c,f)=>{const r=Math.min(255,(c>>16&255)*f|0),g=Math.min(255,(c>>8&255)*f|0),b=Math.min(255,(c&255)*f|0);return r<<16|g<<8|b;};
+function mk(sc,key,w,h,fn){if(sc.textures.exists(key))sc.textures.remove(key);const g=sc.make.graphics({add:false});fn(g);g.generateTexture(key,w*K,h*K);g.destroy();}
+// Adds a 1px dark outline around a sprite texture (classic 16-bit look)
+function outline(sc,key,w,h){
+  const src=sc.textures.get(key).getSourceImage(),c=document.createElement("canvas");w*=K;h*=K;c.width=w;c.height=h;const x=c.getContext("2d");
+  [[1,0],[-1,0],[0,1],[0,-1]].forEach(o=>x.drawImage(src,o[0]*K,o[1]*K));
+  x.globalCompositeOperation="source-in";x.fillStyle="#1b1530";x.fillRect(0,0,w,h);
+  x.globalCompositeOperation="source-over";x.drawImage(src,0,0);sc.textures.remove(key);sc.textures.addCanvas(key,c);
+}
+function drawChar(g,c,step,back){
+  OFF=1; const skin=0xf1c6a0, sd=0xd9a67e, boot=c.boots?0x4a2a12:0x2a2a3a;
+  const l=step===1?1:0,r=step===2?1:0; R(g,c.tr,4,16,3,5-l);R(g,c.tr,9,16,3,5-r);R(g,shade(c.tr,.7),4,16,1,5-l);
+  R(g,boot,4,21-l,3,2);R(g,boot,9,21-r,3,2);
+  if(c.dress){R(g,c.shirt,3,15,10,6);R(g,shade(c.shirt,.75),3,19,10,2);}
+  R(g,c.shirt,4,10,8,7);R(g,shade(c.shirt,.75),4,15,8,2);R(g,c.shirt,2,10,2,5);R(g,shade(c.shirt,.75),12,10,2,5);R(g,c.shirt,12,10,1,5);
+  R(g,skin,2,15,2,1);R(g,skin,12,15,2,1);R(g,sd,7,9,2,1);
+  R(g,skin,4,3,8,7);R(g,sd,4,9,8,1);
+  R(g,c.hair,3,1,10,3);R(g,shade(c.hair,1.35),5,1,3,1);
+  if(c.len==="lang"){R(g,c.hair,3,3,2,9);R(g,c.hair,11,3,2,9);R(g,shade(c.hair,.7),3,9,2,3);R(g,shade(c.hair,.7),11,9,2,3);}
+  else if(c.len==="mittel"){R(g,c.hair,3,3,2,6);R(g,c.hair,11,3,2,6);}
+  else{R(g,c.hair,3,3,1,3);R(g,c.hair,12,3,1,3);}
+  if(c.curly){R(g,c.hair,2,2,12,3);R(g,c.hair,2,5,2,5);R(g,c.hair,12,5,2,5);R(g,shade(c.hair,1.35),4,2,2,1);R(g,shade(c.hair,1.35),9,2,2,1);}
+  R(g,0xffffff,5,5,2,1);R(g,0xffffff,9,5,2,1);R(g,c.eye,5,6,2,1);R(g,c.eye,9,6,2,1);R(g,0xb5524a,7,8,2,1);R(g,0xd9a67e,7,7,1,1);R(g,shade(c.hair,.75),5,4,2,1);R(g,shade(c.hair,.75),9,4,2,1);R(g,0xe8928a,4,8,1,1);R(g,0xe8928a,11,8,1,1);if(c.beard){R(g,c.hair,4,8,8,3);R(g,shade(c.hair,.8),5,10,6,1);}
+  if(c.glasses){g.lineStyle(K,0x000000);g.strokeRect(5.5*K,6.5*K,3*K,2*K);g.strokeRect(9.5*K,6.5*K,3*K,2*K);}
+  if(back){R(g,c.hair,3,1,10,9);R(g,shade(c.hair,1.35),5,2,3,1);}              // seen from behind: hair covers the face
+  if(c.hat){R(g,0x7a4a24,4,0,8,3);R(g,0x5a3a1a,2,3,12,1);R(g,0x9a6a3a,4,0,8,1);R(g,0xc2452d,4,2,8,1);}
+  if(c.scarf){R(g,0xd94a4a,4,9,8,2);R(g,0xa83232,4,10,8,1);}
+  OFF=0;
+}
+const spec=c=>({tr:colors[c.trousers],shirt:colors[c.shirt],hair:colors[c.hair],eye:colors[c.eyes],len:c.hairLength,curly:c.hairStyle==="lockig",
+  dress:c.shirtType==="Kleid",glasses:c.acc==="Brille",hat:c.acc==="Hut",beard:c.acc==="Bart",boots:c.boots});
+// Adds fine, deterministic noise to a tile texture (richer 16-bit look at 2x resolution)
+function grain(sc,key){
+  const tex=sc.textures.get(key),src=tex.getSourceImage(),w=src.width,h=src.height,ctx=src.getContext("2d"),d=ctx.getImageData(0,0,w,h),a=d.data,seed=key.length*7+key.charCodeAt(1)*3;
+  for(let i=0;i<a.length;i+=4){ if(!a[i+3])continue; const px=(i/4)%w,py=(i/4/w)|0,n=Math.sin(px*12.9898+py*78.233+seed)*43758.5453,v=1+((n-Math.floor(n))-.5)*.1;
+    a[i]=Math.min(255,a[i]*v);a[i+1]=Math.min(255,a[i+1]*v);a[i+2]=Math.min(255,a[i+2]*v);}
+  ctx.putImageData(d,0,0); tex.refresh();
+}
+// Side view (facing left; right = mirrored). st = walk frame: 0 stand, 1/2 = steps
+function drawSide(g,c,st){
+  OFF=1; const skin=0xf1c6a0,sd=0xd9a67e,boot=c.boots?0x4a2a12:0x2a2a3a,a=st===1?2:st===2?-2:0;
+  R(g,shade(c.tr,.7),6-a,16,3,5);R(g,boot,5-a,21,4,2);R(g,c.tr,6+a,16,3,5);R(g,boot,5+a,21,4,2);
+  if(c.dress){R(g,c.shirt,4,15,8,6);R(g,shade(c.shirt,.75),4,19,8,2);}
+  R(g,c.shirt,5,10,6,7);R(g,shade(c.shirt,.75),5,15,6,2);R(g,shade(c.shirt,.85),7-a,10,2,5);R(g,skin,7-a,15,2,1);
+  if(c.scarf)R(g,0xd94a4a,5,9,6,2);
+  R(g,skin,4,3,7,7);R(g,sd,4,9,7,1);R(g,sd,3,7,1,1);
+  R(g,c.hair,5,1,8,3);R(g,c.hair,8,3,4,6);R(g,shade(c.hair,1.35),6,1,3,1);
+  if(c.len==="lang")R(g,c.hair,9,3,3,9); else if(c.len==="mittel")R(g,c.hair,9,3,3,6);
+  if(c.curly){R(g,c.hair,4,2,9,3);R(g,c.hair,10,4,3,5);}
+  R(g,0xffffff,5,5,2,1);R(g,c.eye,5,6,2,1);R(g,0xb5524a,4,8,1,1);
+  if(c.glasses){R(g,0x000000,4,5,4,1);R(g,0x000000,4,7,4,1);R(g,0x000000,4,5,1,3);}
+  if(c.beard)R(g,c.hair,4,8,5,3);
+  if(c.hat){R(g,0x7a4a24,4,0,9,3);R(g,0x5a3a1a,3,3,9,1);R(g,0x9a6a3a,4,0,9,1);}
+  OFF=0;
+}
+function makeHero(sc){
+  const h=S.hero||{hair:"braun",len:"kurz",eyes:"braun",shirt:"blau",trousers:"grau"};
+  const pl={tr:colors[h.trousers],shirt:colors[h.shirt],hair:colors[h.hair],eye:colors[h.eyes],len:h.len,scarf:true};
+  ["d","u","l"].forEach(d=>[0,1,2].forEach(f=>{const k="h_"+d+f;mk(sc,k,18,26,g=>d==="l"?drawSide(g,pl,f):drawChar(g,pl,f,d==="u"));outline(sc,k,18,26);})); // 4 directions x 3 walk frames
+}
+function makeTextures(sc){
+  const gl=sc.textures.createCanvas("glow",48,48),gx=gl.getContext(),gg=gx.createRadialGradient(24,24,2,24,24,24);   // torch light
+  gg.addColorStop(0,"rgba(255,180,70,.6)");gg.addColorStop(1,"rgba(255,180,70,0)");gx.fillStyle=gg;gx.fillRect(0,0,48,48);gl.refresh();
+  const gr=g=>{R(g,0x5a9e4b,0,0,16,16);[[3,4],[11,9],[7,13],[13,2],[1,10]].forEach(p=>{R(g,0x4a8a3e,p[0],p[1],2,1);R(g,0x72b35c,p[0]+1,p[1]-1,1,1);});};
+  const crown=[[4,0,8,1],[2,1,12,2],[1,3,14,6],[2,9,12,2],[4,11,8,1]];
+  const tiles=[g=>gr(g),
+   g=>{R(g,0xc9a66b,0,0,16,16);[[2,3],[9,7],[5,12],[13,13],[12,2]].forEach(p=>{R(g,0xa88a54,p[0],p[1],2,1);R(g,0xdcbf86,p[0],p[1]-1,1,1);});},
+   g=>{R(g,0x3b78c2,0,0,16,16);R(g,0x4f93d8,1,4,6,1);R(g,0x4f93d8,8,10,7,1);R(g,0xa9d4f5,3,4,2,1);R(g,0xa9d4f5,10,10,2,1);R(g,0x2f66a8,0,14,16,2);},
+   g=>{gr(g);R(g,0x4a8a3e,3,13,10,2);R(g,0x5a3a1a,7,10,3,5);crown.forEach(r=>R(g,0x1d4a26,r[0],r[1],r[2],r[3]));R(g,0x2f7a3c,3,2,10,7);R(g,0x4a9e54,4,2,5,3);R(g,0x6bbf6e,5,3,2,1);},
+   g=>{R(g,0xb5483a,0,0,16,16);[4,8,12].forEach(y=>{R(g,0x8f3a30,0,y,16,1);for(let x=(y%8?2:6);x<16;x+=8)R(g,0x8f3a30,x,y-4,1,4);});R(g,0xd2604f,0,0,16,1);},
+   g=>{R(g,0xe8dcc0,0,0,16,16);R(g,0xc8bb9c,0,13,16,3);R(g,0x6b4423,4,3,8,8);R(g,0x7ec4ec,5,4,6,6);R(g,0x6b4423,7,4,2,6);R(g,0x6b4423,5,7,6,1);R(g,0xffffff,5,4,1,2);},
+   g=>{gr(g);R(g,0xa0703a,0,6,16,2);R(g,0xa0703a,0,10,16,2);R(g,0x6b4423,0,8,16,1);R(g,0x6b4423,0,12,16,1);[2,12].forEach(x=>{R(g,0x8b5a2b,x,3,2,11);R(g,0xb98550,x,3,1,10);});},
+   g=>{gr(g);[[4,5,0xf2e24a],[10,10,0xe86a92],[9,3,0xffffff]].forEach(f=>{R(g,0x2f7a3c,f[0]+1,f[1]+2,1,3);R(g,f[2],f[0],f[1],3,3);R(g,0xf2a03a,f[0]+1,f[1]+1,1,1);});},
+   g=>{R(g,0x9a6a3a,0,0,16,16);[0,5,10].forEach(y=>{R(g,0xb98550,0,y,16,1);R(g,0x6b4423,0,y+4,16,1);});},
+   g=>{R(g,0xc9a66b,0,0,16,16);R(g,0x4a2a12,0,1,3,14);R(g,0x4a2a12,13,1,3,14);R(g,0x8b5a2b,3,3,10,3);R(g,0x8b5a2b,3,9,10,3);R(g,0xb98550,3,3,10,1);R(g,0xb98550,3,9,10,1);R(g,0xf2c94c,7,6,2,3);},
+   g=>{gr(g);R(g,0x6a6a76,3,7,10,7);R(g,0x8a8a94,4,6,8,7);R(g,0xb4b4c0,5,6,4,2);R(g,0x4a4a56,3,13,10,1);},
+   g=>{gr(g);R(g,0x4a2a12,7,7,2,9);R(g,0x8b5a2b,6,6,4,2);R(g,0xff7a1a,6,2,4,5);R(g,0xffc23a,7,3,2,3);R(g,0xfff3a0,7,4,1,1);},
+   g=>{gr(g);R(g,0x4a3a1a,2,12,12,1);R(g,0xa0703a,1,5,14,3);R(g,0xb98550,1,5,14,1);R(g,0x8b5a2b,1,8,14,2);R(g,0x5a3a1a,2,10,2,4);R(g,0x5a3a1a,12,10,2,4);},
+   g=>{R(g,0xe8dcc0,0,0,16,16);R(g,0xc8bb9c,0,13,16,3);R(g,0x5a3a1a,3,2,10,14);R(g,0x7a4a24,4,3,8,13);R(g,0x5a3a1a,8,3,1,13);R(g,0xf2c94c,10,9,1,2);}];
+  tiles.forEach((f,i)=>mk(sc,"t"+i,16,16,f));
+  const roof=g=>{R(g,0xb5483a,0,0,16,16);[4,8,12].forEach(y=>{R(g,0x8f3a30,0,y,16,1);for(let x=(y%8?2:6);x<16;x+=8)R(g,0x8f3a30,x,y-4,1,4);});R(g,0xd2604f,0,0,16,1);};
+  const aw=(a,b)=>g=>{R(g,0x6b4423,0,6,16,10);R(g,0xb98550,0,6,16,2);for(let x=0;x<16;x+=4)R(g,x%8?b:a,x,0,4,6);R(g,shade(a,.7),0,5,16,1);R(g,0x4a2a12,0,14,16,2);R(g,0xd94a4a,3,10,2,2);R(g,0xf2e24a,7,10,2,2);R(g,0x6bbf6e,11,10,2,2);};
+  const E={ // extra tiles: grass variants, path edges, water frame 2, tree 2, interiors
+   t0b:g=>{R(g,0x5a9e4b,0,0,16,16);[[2,2],[9,5],[5,10],[12,12],[14,7]].forEach(p=>{R(g,0x4a8a3e,p[0],p[1],1,2);R(g,0x72b35c,p[0]+1,p[1],1,1);});},
+   t0c:g=>{R(g,0x5a9e4b,0,0,16,16);R(g,0x4a8a3e,1,6,3,1);R(g,0x4a8a3e,10,12,3,1);R(g,0x6fae59,6,3,2,1);R(g,0x6fae59,12,9,2,1);},
+   t1t:g=>{R(g,0xc9a66b,0,0,16,16);R(g,0x5a9e4b,0,0,16,3);R(g,0xa88a54,0,3,16,1);[1,5,9,13].forEach(x=>R(g,0x5a9e4b,x,3,2,1));R(g,0xdcbf86,6,9,2,1);R(g,0xa88a54,11,12,2,1);},
+   t1b:g=>{R(g,0xc9a66b,0,0,16,16);R(g,0x5a9e4b,0,13,16,3);R(g,0xa88a54,0,12,16,1);[3,7,11].forEach(x=>R(g,0x5a9e4b,x,12,2,1));R(g,0xdcbf86,4,5,2,1);R(g,0xa88a54,10,7,2,1);},
+   t2b:g=>{R(g,0x3b78c2,0,0,16,16);R(g,0x4f93d8,6,6,6,1);R(g,0x4f93d8,0,12,6,1);R(g,0xa9d4f5,8,6,2,1);R(g,0xa9d4f5,2,12,2,1);R(g,0x2f66a8,0,14,16,2);},
+   t3b:g=>{gr(g);R(g,0x4a8a3e,3,13,10,2);R(g,0x5a3a1a,7,10,3,5);crown.forEach(r=>R(g,0x2c6b36,r[0],r[1],r[2],r[3]));R(g,0x3d8c47,3,2,10,7);R(g,0x5bb066,4,2,5,3);R(g,0xd94a4a,10,6,1,1);R(g,0xd94a4a,5,7,1,1);},
+   t15:g=>{R(g,0x8a8a94,0,0,16,16);R(g,0xf2c94c,0,0,16,2);R(g,0xf2c94c,0,14,16,2);R(g,0xf2c94c,0,0,2,16);R(g,0xf2c94c,14,0,2,16);R(g,0x6b4423,4,2,8,12);R(g,0x4a2a12,4,2,8,2);R(g,0xf2c94c,10,8,1,2);},
+   t16:g=>{R(g,0x8e8e9a,0,0,16,16);for(let y=0;y<16;y+=8)for(let x=0;x<16;x+=8)R(g,0xa8a8b6,x+(y?4:0),y,7,7);},
+   t17:g=>{R(g,0x6a5a7a,0,0,16,16);[0,5,10].forEach((y,i)=>{R(g,0x4a3a5a,0,y+4,16,1);for(let x=(i%2?3:7);x<16;x+=8)R(g,0x4a3a5a,x,y,1,4);});R(g,0x8a7a9a,0,0,16,1);},
+   t18:g=>{R(g,0x6b4423,0,6,16,10);R(g,0xb98550,0,6,16,2);for(let x=0;x<16;x+=4)R(g,x%8?0xffffff:0xc2452d,x,0,4,6);R(g,0x4a2a12,0,14,16,2);R(g,0xd94a4a,3,10,2,2);R(g,0xf2e24a,7,10,2,2);R(g,0x6bbf6e,11,10,2,2);},
+   t19:g=>{R(g,0xd8cfe0,0,0,16,16);R(g,0xb4a8c8,0,0,8,8);R(g,0xb4a8c8,8,8,8,8);},
+   t20:g=>{R(g,0xd8cfe0,0,0,16,16);R(g,0xb5253a,2,0,12,16);R(g,0xf2c94c,2,0,1,16);R(g,0xf2c94c,13,0,1,16);R(g,0xd0384d,5,0,2,16);},
+   t21:g=>{R(g,0xd8cfe0,0,0,16,16);R(g,0x6a6a76,3,1,10,2);R(g,0x8a8a94,4,2,8,13);R(g,0xb4b4c0,5,2,3,12);R(g,0x6a6a76,3,14,10,2);},
+   t22:g=>{R(g,0x8e8e9a,0,0,16,16);R(g,0x4a2a12,2,3,12,11);R(g,0xa0703a,3,4,10,9);R(g,0x6b4423,2,8,12,1);R(g,0x6b4423,8,3,1,11);},
+   t23:g=>{R(g,0x6a5a7a,0,0,16,16);R(g,0x4a3a5a,0,15,16,1);R(g,0x4a2a12,7,7,2,9);R(g,0xff7a1a,6,2,4,6);R(g,0xffc23a,7,3,2,4);R(g,0xfff3a0,7,5,1,1);},
+   t31:aw(0x3a6fd8,0xffffff), t32:aw(0x3a9a4a,0xf2e24a),
+   t33:g=>{R(g,0x8e8e9a,0,0,16,16);R(g,0x4a4a56,0,0,16,1);R(g,0x6a6a76,1,1,14,14);R(g,0x3b78c2,3,3,10,10);R(g,0x4f93d8,4,4,3,1);R(g,0xa9d4f5,9,8,2,1);R(g,0xb4b4c0,7,5,2,6);R(g,0xe0f0ff,7,3,2,2);},
+   t34:g=>{R(g,0x8e8e9a,0,0,16,16);R(g,0x8b5a2b,3,9,10,6);R(g,0x6b4423,3,9,10,1);R(g,0x3a9a4a,3,5,10,5);R(g,0xe86a92,4,4,2,2);R(g,0xf2e24a,8,3,2,2);R(g,0xffffff,11,5,2,2);},
+   t36:g=>{R(g,0xbca98a,0,0,16,16);R(g,0xd2c2a4,0,0,8,8);R(g,0xd2c2a4,8,8,8,8);R(g,0xa8946f,0,0,16,1);R(g,0xa8946f,0,0,1,16);},
+   t38:g=>{R(g,0xe8dcc0,0,0,16,16);R(g,0xc8bb9c,0,13,16,3);R(g,0x5a3a1a,3,2,10,14);R(g,0x7a4a24,4,3,8,13);R(g,0x5a3a1a,8,3,1,13);R(g,0xf2c94c,10,9,1,2);R(g,0x8a8a94,2,14,12,2);},
+   t39:g=>{R(g,0xb08050,0,0,16,16);[0,5,10,15].forEach(y=>R(g,0x8a6038,0,y,16,1));[3,11].forEach(x=>R(g,0x8a6038,x,0,1,5));[7].forEach(x=>R(g,0x8a6038,x,5,1,5));[3,12].forEach(x=>R(g,0x8a6038,x,10,1,5));},
+   t41:g=>{R(g,0xb08050,0,0,16,16);R(g,0x6b4423,1,1,14,14);R(g,0xd94a4a,2,5,12,9);R(g,0xb03a3a,2,11,12,3);R(g,0xfdf3d8,3,2,7,3);},
+   t42:g=>{R(g,0x6a6a76,0,0,16,16);R(g,0x4a4a56,0,0,16,2);R(g,0x1b1530,3,6,10,10);R(g,0xff7a1a,5,9,6,7);R(g,0xffc23a,6,11,4,5);R(g,0xfff3a0,7,13,2,2);},
+   t43:g=>{gr(g);[[3,5,10,1],[2,6,12,6],[3,12,10,1]].forEach(r=>R(g,0x1d4a26,r[0],r[1],r[2],r[3]));R(g,0x2f7a3c,3,6,10,5);R(g,0x5bb066,4,6,4,2);R(g,0xd94a4a,9,8,1,1);R(g,0xd94a4a,6,9,1,1);},
+   t28:g=>{roof(g);R(g,0x6f2e26,0,0,2,16);R(g,0xd2604f,2,0,1,16);},
+   t29:g=>{roof(g);R(g,0x6f2e26,14,0,2,16);R(g,0x8f3a30,13,0,1,16);},
+   t30:g=>{roof(g);R(g,0x6a5a7a,9,0,4,7);R(g,0x4a3a5a,9,0,4,1);R(g,0x4a3a5a,12,1,1,6);R(g,0x8a7a9a,9,2,3,1);R(g,0x8a7a9a,10,4,3,1);},
+   wb0:g=>{R(g,0xe0cfa0,0,0,16,3);R(g,0xc9b27a,0,3,16,1);}, wb1:g=>{R(g,0xe0cfa0,13,0,3,16);R(g,0xc9b27a,12,0,1,16);},
+   wb2:g=>{R(g,0xe0cfa0,0,13,16,3);R(g,0xc9b27a,0,12,16,1);}, wb3:g=>{R(g,0xe0cfa0,0,0,3,16);R(g,0xc9b27a,3,0,1,16);},
+   t25:g=>{R(g,0x6a5a7a,0,0,16,16);R(g,0x4a3a5a,0,15,16,1);R(g,0xb5253a,4,0,8,12);R(g,0xf2c94c,4,0,8,1);R(g,0xf2c94c,7,3,2,5);R(g,0xb5253a,4,12,3,2);R(g,0xb5253a,9,12,3,2);},
+   t26:g=>{R(g,0x4a2a12,0,0,16,16);[2,9].forEach(y=>{R(g,0x8b5a2b,1,y+4,14,1);[1,4,7,10,13].forEach((x,i)=>R(g,[0xb5253a,0x3a6fd8,0x3a9a4a,0xf2c94c,0x8a4fc0][i],x,y,2,4));});},
+   t27:g=>{R(g,0xd8cfe0,0,0,16,16);R(g,0x4a2a12,0,3,16,11);R(g,0xa0703a,0,3,16,9);R(g,0xb98550,0,3,16,1);R(g,0xfdf3d8,3,5,4,3);R(g,0xd94a4a,10,6,2,2);},
+   book:g=>{R(g,0x6a5a7a,5,8,6,8);R(g,0x4a3a5a,4,14,8,2);R(g,0x4a2a12,2,3,12,6);R(g,0xfdf3d8,3,4,5,4);R(g,0xfdf3d8,8,4,5,4);R(g,0x8a7a9a,8,4,1,4);},
+   t24:g=>{R(g,0xd8cfe0,0,0,16,16);R(g,0xf2c94c,2,1,12,14);R(g,0xb5253a,3,3,10,12);R(g,0x8f1d2e,4,9,8,6);R(g,0xf2c94c,2,1,12,2);}};
+  Object.entries(E).forEach(([k,f])=>mk(sc,k,16,16,f));
+  mk(sc,"ws",16,5,g=>{g.fillStyle(0,.3).fillRect(0,0,16*K,3*K);g.fillStyle(0,.15).fillRect(0,3*K,16*K,2*K);});     // shadow under interior walls
+  mk(sc,"cl",96,40,g=>g.fillStyle(0x0a1030,.16).fillEllipse(48*K,20*K,96*K,40*K));
+  mk(sc,"fish",8,4,g=>{R(g,0x8ab4d8,1,0,5,3);R(g,0xe8f4ff,1,2,5,1);R(g,0x6a94b8,6,0,2,3);R(g,0x1b1530,2,0,1,1);});
+  mk(sc,"cat",12,9,g=>{R(g,0xd98c3a,1,3,7,4);R(g,0xd98c3a,7,2,4,4);R(g,0xd98c3a,7,1,1,1);R(g,0xd98c3a,10,1,1,1);R(g,0xd98c3a,0,1,1,4);R(g,0xb06a22,2,7,1,1);R(g,0xb06a22,6,7,1,1);R(g,0xb06a22,3,3,1,3);R(g,0x1b1530,9,3,1,1);R(g,0xf0b0b0,11,4,1,1);});
+  mk(sc,"hen",10,10,g=>{R(g,0xf4f0e6,2,4,5,4);R(g,0xf4f0e6,1,3,2,3);R(g,0xf4f0e6,6,2,3,3);R(g,0xc2452d,7,1,1,1);R(g,0xe8a030,9,3,1,1);R(g,0xe8a030,4,8,1,1);R(g,0xe8a030,6,8,1,1);R(g,0x1b1530,8,3,1,1);R(g,0xd8d0c0,3,5,3,2);});
+  mk(sc,"rabbit",10,9,g=>{R(g,0xb59a7a,1,4,6,4);R(g,0xb59a7a,6,2,3,3);R(g,0xb59a7a,6,0,1,2);R(g,0xb59a7a,8,0,1,2);R(g,0xf4f0e6,0,5,2,2);R(g,0x1b1530,8,3,1,1);R(g,0x8a7050,2,8,2,1);R(g,0x8a7050,6,8,2,1);});
+  mk(sc,"duck",10,8,g=>{R(g,0xf2e6c9,1,3,7,4);R(g,0xf2e6c9,0,2,2,2);R(g,0x2f8f5a,6,1,3,3);R(g,0xe8a030,9,2,1,1);R(g,0x9a7a4a,2,4,4,2);R(g,0x1b1530,7,2,1,1);R(g,0xf4f0e6,6,4,2,1);});
+  [["bfa",0xf19a8f],["bfb",0xf4d35e],["bfc",0x8fb4f1]].forEach(([k,c])=>mk(sc,k,6,6,g=>{R(g,c,0,1,2,3);R(g,c,4,1,2,3);R(g,shade(c,.7),0,3,2,1);R(g,shade(c,.7),4,3,2,1);R(g,0x1b1530,2,1,2,4);}));
+  mk(sc,"bird0",8,5,g=>{R(g,0x2b1d3a,0,1,3,1);R(g,0x2b1d3a,5,1,3,1);R(g,0x2b1d3a,3,2,2,2);});
+  mk(sc,"bird1",8,5,g=>{R(g,0x2b1d3a,0,3,3,1);R(g,0x2b1d3a,5,3,3,1);R(g,0x2b1d3a,3,1,2,2);});
+  mk(sc,"ring",10,10,g=>{g.lineStyle(K,0xffffff,.9);g.strokeCircle(5*K,5*K,4*K);});
+  mk(sc,"bottle",16,16,g=>{R(g,0x2f8f5a,6,6,4,8);R(g,0x4fbf80,7,7,1,5);R(g,0x2f8f5a,7,3,2,3);R(g,0xb98550,7,2,2,1);R(g,0xfdf3d8,7,9,2,3);});                                 // cloud shadow
+  mk(sc,"ff",6,6,g=>{g.fillStyle(0xfff7a0,.35).fillRect(0,0,6*K,6*K);g.fillStyle(0xfff7a0,1).fillRect(2*K,2*K,2*K,2*K);}); // firefly
+  sc.textures.getTextureKeys().filter(k=>/^t\d+[a-z]?$/.test(k)).forEach(k=>grain(sc,k)); // fine grain on all ground/building tiles
+  mk(sc,"sh",14,5,g=>g.fillStyle(0x000000,.3).fillEllipse(7*K,2.5*K,14*K,5*K));
+  mk(sc,"chest",16,16,g=>{R(g,0x4a2a12,2,5,12,10);R(g,0x8b5a2b,3,6,10,8);R(g,0x6b4423,3,9,10,1);R(g,0xf2c94c,2,5,12,1);R(g,0xf2c94c,7,8,2,3);});
+  mk(sc,"sign",16,16,g=>{R(g,0x6b4423,7,8,2,8);R(g,0x5a3a1a,2,2,12,8);R(g,0xd8b878,3,3,10,6);R(g,0x6b4423,4,4,8,1);R(g,0x6b4423,4,6,6,1);});
+  [...characters,...storyNpcs].forEach(c=>{mk(sc,"c_"+c.id,18,26,g=>drawChar(g,spec(c),0));outline(sc,"c_"+c.id,18,26);});
+  makeHero(sc);
+}
+// ---- Collision & path finding ----
+const solidTile=(x,y)=>x<0||y<0||x>=W||y>=H||BLK.includes(grid[y][x])||solid.has(x+","+y);
+const free=(x,y)=>[[-4,0],[4,0],[-4,-4],[4,-4]].every(o=>!solidTile((x+o[0])/T|0,(y+o[1])/T|0));
+function bfs(sx,sy,gx,gy){
+  const k=(x,y)=>x+","+y, prev={[k(sx,sy)]:null}, q=[[sx,sy]];
+  while(q.length){const [x,y]=q.shift();
+    if(x===gx&&y===gy){const out=[];let c=k(x,y);while(prev[c]){const [a,b]=c.split(",").map(Number);out.unshift({x:a*T+8,y:b*T+10});c=prev[c];}return out;}
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,nk=k(nx,ny);
+      if(nk in prev||solidTile(nx,ny))continue;prev[nk]=k(x,y);q.push([nx,ny]);}}
+  return null;
+}
+// A tile counts as deep water when all 8 neighbours are water too (fish may only hop there)
+const deepWater=w=>{const tx=(w.x-8)/T|0, ty=(w.y-8)/T|0;
+  for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)if(!(grid[ty+dy]&&grid[ty+dy][tx+dx]===2))return false; return true;};
+// ---- Phaser scene ----
+class Main extends Phaser.Scene{
+  create(){
+    scene=this; makeTextures(this);
+    const GF=Phaser.GameObjects.GameObjectFactory.prototype, mkImg=GF.image, mkSpr=GF.sprite;   // all art is K x resolution -> show at 1/K
+    this.add.image=(...a)=>mkImg.apply(this.add,a).setScale(1/K); this.add.sprite=(...a)=>mkSpr.apply(this.add,a).setScale(1/K);
+    for(let y=0;y<H;y++){grid.push(Array(W).fill(0));}
+    const set=(x,y,t)=>{if(x>=0&&y>=0&&x<W&&y<H)grid[y][x]=t;};
+    let seed=7; const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+    for(let x=1;x<W-1;x++){set(x,14,1);set(x,15,1);}                       // main road
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){                              // flowers, stones, forest
+      if(y>=12&&y<=17)continue; const r=rnd();
+      if(x>=36&&x<=46&&r<.35)set(x,y,3); else if(r<.05)set(x,y,7); else if(r>.985)set(x,y,10);}
+    for(let y=4;y<=7;y++)for(let x=6;x<=9;x++)set(x,y,2);                 // pond
+    [[22,7],[27,7],[24,20]].forEach(([hx,hy])=>{for(let dx=0;dx<3;dx++){set(hx+dx,hy,dx===0?28:dx===2?29:30);set(hx+dx,hy+1,dx===1?38:5);}}); // houses
+    for(let x=21;x<=29;x++){set(x,10,6);set(x,18,6);} 
+    set(23,18,0);set(25,18,0);                                              // gaps in fences
+    [14,15].forEach(y=>[48,49,50].forEach(x=>set(x,y,8)));
+    for(let y=0;y<H;y++){[48,49,50].forEach(x=>{if(y<14||y>15)set(x,y,2);});    // river
+      gates.forEach(g=>{if(y<14||y>15)set(g.x,y,3);else set(g.x,y,9);});}
+    gates.forEach(g=>{set(g.x-1,13,11);set(g.x-1,16,11);});                // torches
+    set(14,16,12);set(28,16,12);                                            // benches
+    for(let x=0;x<W;x++){set(x,0,3);set(x,H-1,3);} for(let y=0;y<H;y++){set(0,y,3);set(W-1,y,3);}
+    [...signs,...finds].forEach(o=>{if(o.ty<30&&!o.water)set(o.tx,o.ty,0);solid.add(o.tx+","+o.ty);});
+    // --- bushes, river into the pond, clear paths to the house doors ---
+    for(let y=1;y<29;y++)for(let x=1;x<59;x++)if(grid[y][x]===0&&(y<12||y>17)&&!solid.has(x+","+y)&&rnd()<.02)set(x,y,43);
+    [[8,1],[9,1],[8,2],[9,2],[7,3],[8,3]].forEach(c=>set(c[0],c[1],2)); set(7,1,10);set(10,1,10);set(7,2,10);   // river from the spring into the pond
+    [[5,4],[5,5],[5,6]].forEach(c=>set(c[0],c[1],0));
+    for(let y=9;y<=11;y++)for(let x=21;x<=30;x++)set(x,y,0);
+    for(let x=21;x<=29;x++)if(x!==23&&x!==28)set(x,10,6);
+    for(let y=19;y<=23;y++)for(let x=22;x<=28;x++)if(!(x>=24&&x<=26&&y>=20&&y<=21))set(x,y,0);
+    // --- castle garden, hermit clearing + hidden trail (outdoors) ---
+    [[52,12],[53,12],[58,12],[51,13],[58,13]].forEach(c=>set(c[0],c[1],7)); [[55,12],[57,12]].forEach(c=>set(c[0],c[1],11));
+    for(let x=51;x<=58;x++)if(x!==54&&x!==55)set(x,18,6);                    // garden fence with a gap
+    for(let y=19;y<=26;y++)for(let x=51;x<=58;x++)if((x+y)%3===0)set(x,y,7); // flower beds
+    for(let y=21;y<=24;y++)for(let x=54;x<=57;x++)set(x,y,2);          // garden pond
+    [[53,20],[57,20],[53,23]].forEach(c=>set(c[0],c[1],12));                 // benches
+    for(let y=4;y<=7;y++)for(let x=39;x<=43;x++)set(x,y,0);                  // hermit clearing
+    [[38,11],[38,10],[38,9],[39,9],[40,9],[40,8],[41,8]].forEach(c=>set(c[0],c[1],0)); // trail between the trees
+    [40,41,42].forEach(x=>set(x,2,4)); set(40,3,5);set(41,3,38);set(42,3,5); // hermit hut
+    [[39,4],[43,4]].forEach(c=>set(c[0],c[1],11)); [[40,6],[42,7],[39,5]].forEach(c=>set(c[0],c[1],7));
+    for(let x=0;x<W;x++)set(x,29,3);
+    for(let y=30;y<H;y++)grid[y].fill(14);                                   // rows 30+ hold the interiors (void around them)
+    const room=(x0,y0,fl)=>{for(let y=y0;y<y0+18;y++)for(let x=x0;x<x0+30;x++)set(x,y,(y===y0||y===y0+17||x===x0||x===x0+29)?17:fl);};
+    room(0,32,16); room(30,32,19);                                           // market (left) and castle (right)
+      // market stalls
+    [[2,34],[27,34],[2,44],[27,44],[12,43],[17,43]].forEach(c=>set(c[0],c[1],22));
+    [5,14,24,35,40,49,54].forEach(x=>set(x,32,23));                          // wall torches
+    for(let y=35;y<49;y++)set(44,y,20);                                      // castle carpet
+    set(44,34,24);set(45,34,24);[[34,36],[34,42],[55,36],[55,42]].forEach(c=>set(c[0],c[1],21));
+    [14,15,44,45].forEach(x=>set(x,49,15));
+    [37,43,46,52].forEach(x=>set(x,32,25));                                  // castle banners
+    [[32,33],[33,33],[56,33],[57,33]].forEach(c=>set(c[0],c[1],26));         // bookshelves
+    for(let x=36;x<=39;x++)[44,45].forEach(y=>{set(x,y,27);set(x+14,y,27);}); // banquet tables
+    const hroom=(x0,y0,ex)=>{ for(let y=y0;y<y0+10;y++)for(let x=x0;x<x0+16;x++)set(x,y,(y===y0||y===y0+9||x===x0||x===x0+15)?17:39);   // house rooms (16x10)
+      [[7,1,42],[2,2,41],[13,1,26],[14,1,26],[10,4,27],[11,4,27],...ex].forEach(f=>set(x0+f[0],y0+f[1],f[2]));
+      set(x0+3,y0,23);set(x0+12,y0,23);set(x0+7,y0+9,15);set(x0+8,y0+9,15);};
+    hroom(0,52,[]);hroom(25,52,[[3,6,27],[4,6,27],[13,7,22],[14,7,22]]);hroom(0,66,[[14,2,41],[2,7,22]]);hroom(25,66,[[2,5,41],[12,7,22]]);
+    // market: coloured stalls, plaza, fountain, flower boxes
+    [[3,35,18],[8,35,31],[19,35,32],[24,35,18],[3,41,32],[8,41,18],[19,41,18],[24,41,31]].forEach(c=>{set(c[0],c[1],c[2]);set(c[0]+1,c[1],c[2]);});
+    for(let y=36;y<=41;y++)for(let x=11;x<=18;x++)set(x,y,36);
+    set(14,38,33); [[6,33],[10,33],[18,33],[22,33]].forEach(c=>set(c[0],c[1],34));                                  // exits
+    [32,33,34].forEach((x,i)=>{set(x,10,18);set(x,11,i===1?15:18);});        // market tent outside (door 33,11)
+    [[54,8,21],[55,8,17],[56,8,25],[57,8,17],[58,8,21],[54,9,17],[55,9,17],[56,9,17],[57,9,17],[58,9,17],[54,10,17],[55,10,17],[56,10,17],[57,10,17],[58,10,17],[54,11,17],[55,11,17],[56,11,15],[57,11,17],[58,11,17]].forEach(c=>set(c[0],c[1],c[2])); // castle (door 56,11)
+    // portals: "tile" -> [target tile x, y, region]
+    this.P={"23,8":[7,59,3],"28,8":[32,59,4],"25,21":[7,73,5],"41,3":[32,73,6],"7,61":[23,9,0],"8,61":[23,9,0],"32,61":[28,9,0],"33,61":[28,9,0],"7,75":[25,22,0],"8,75":[25,22,0],"32,75":[41,4,0],"33,75":[41,4,0],"33,11":[14,47,1],"14,49":[33,12,0],"15,49":[33,12,0],"56,11":[44,47,2],"44,49":[56,12,0],"45,49":[56,12,0]};
+    this.REG=[[0,0,W*T,30*T,"🌳 Dorf"],[0,32*T,30*T,18*T,"🛒 Markt"],[30*T,32*T,30*T,18*T,"🏰 Schloss"],...[[0,52],[25,52],[0,66],[25,66]].map(r=>[(r[0]-3)*T,(r[1]-3)*T,22*T,16*T,"🏠 Haus"])];
+    const isPath=[1,8,9,15], water=[]; let wf=false;
+    this.tiles=grid.map((row,y)=>row.map((t,x)=>{ if(t===14)return null;
+      let k="t"+t; if(t===0)k=["t0","t0b","t0c"][(x*7+y*13)%3]; else if(t===3&&(x+y)%3===0)k="t3b";
+      else if(t===1&&!isPath.includes(grid[y-1][x]))k="t1t"; else if(t===1&&!isPath.includes(grid[y+1][x]))k="t1b";
+      const im=this.add.image(x*T+8,y*T+8,k).setDepth(0); if(t===2)water.push(im);
+      if(t===11||t===23||t===42){this.tweens.add({targets:im,alpha:.78,duration:300+Math.random()*200,yoyo:true,repeat:-1});
+        const gl=this.add.image(x*T+8,y*T+5,"glow").setBlendMode(Phaser.BlendModes.ADD).setDepth(9000);   // flickering torch light
+        this.tweens.add({targets:gl,alpha:{from:.35,to:.8},scale:{from:.9,to:1.2},duration:350+Math.random()*250,yoyo:true,repeat:-1});}
+      if(t===2)[[0,-1,"wb0"],[1,0,"wb1"],[0,1,"wb2"],[-1,0,"wb3"]].forEach(d=>{const n=grid[y+d[1]]&&grid[y+d[1]][x+d[0]];   // sandy shore
+        if(n!==undefined&&n!==2&&n!==14)this.add.image(x*T+8,y*T+8,d[2]).setDepth(1);});
+      if((t===16||t===19||t===20||t===39)&&grid[y-1][x]===17)this.add.image(x*T,y*T,"ws").setOrigin(0,0).setDepth(1);
+      return im;}));
+    this.time.addEvent({delay:650,loop:true,callback:()=>{wf=!wf;water.forEach(i=>i.setTexture(wf?"t2b":"t2"));}});
+    this.time.addEvent({delay:1500,loop:true,callback:()=>this.jumpFish(water)});
+    this.time.addEvent({delay:700,loop:true,callback:()=>this.ripple(water)});   // small waters: ripples + fish shadow, no hop
+    this.water=water;
+    this.ints=[];
+    signs.forEach(s=>{this.add.image(s.tx*T+8,s.ty*T+8,"sign").setDepth(s.ty*T);this.ints.push({kind:"sign",x:s.tx*T+8,y:s.ty*T+8,text:s.text,label:"📜 Lesen"});});
+    finds.forEach(f=>{const fi=this.add.image(f.tx*T+8,f.ty*T+8,f.icon).setDepth(f.ty*T); if(f.icon==="bottle")this.tweens.add({targets:fi,y:fi.y+2,angle:{from:-8,to:8},duration:1000,yoyo:true,repeat:-1,ease:"Sine.easeInOut"});this.ints.push({kind:"find",f,x:f.tx*T+8,y:f.ty*T+8,label:f.icon==="chest"?"🎒 Öffnen":"📜 Lesen"});});
+    
+    this.npcs=[...characters,...storyNpcs].map(n=>{
+      const sc=n.height==="groß"?1.12:n.height==="klein"?.85:1, x=n.tx*T+8, y=n.ty*T+14;
+      const s=this.add.sprite(x,y,"c_"+n.id).setOrigin(.5,1).setScale(sc/K).setDepth(y);
+      this.add.image(x,y-1,"sh").setScale(sc/K).setDepth(y-1); this.tweens.add({targets:s,scaleY:sc/K*1.04,duration:650+Math.random()*300,yoyo:true,repeat:-1});
+      this.add.text(x,y-26*sc-2,n.name,{fontFamily:"monospace",fontSize:"8px",color:"#fff",stroke:"#000",strokeThickness:2}).setOrigin(.5,1).setResolution(3).setDepth(9999);
+      solid.add(n.tx+","+n.ty);
+      const o={kind:"npc",n,x,y:y-6,s,label:"💬 Sprechen"}; this.ints.push(o); return o;});
+    this.psh=this.add.image(0,0,"sh"); this.pl=this.add.sprite(4*T+8,15*T+10,"h_d0").setOrigin(.5,1);
+    this.cameras.main.setRoundPixels(true).setZoom(2); this.setRegion(0);
+    for(let i=0;i<20;i++){const fx=(i<14?37+Math.random()*10:39+Math.random()*5)*T, fy=(i<14?18+Math.random()*9:3+Math.random()*5)*T;   // fireflies
+      const f=this.add.image(fx,fy,"ff").setBlendMode(Phaser.BlendModes.ADD).setDepth(9000);
+      this.tweens.add({targets:f,x:fx+Phaser.Math.Between(-28,28),y:fy+Phaser.Math.Between(-18,18),alpha:{from:.15,to:1},duration:1400+Math.random()*1800,yoyo:true,repeat:-1,ease:"Sine.easeInOut"});}
+    for(let i=0;i<3;i++){const c=this.add.image(-100,40+i*170,"cl").setDepth(8000);this.tweens.add({targets:c,x:W*T+100,duration:70000+i*15000,repeat:-1,delay:i*9000});} // clouds        // soft vignette
+    
+    this.initAnimals();
+    this.refreshGates(); hud(); if(!S.hero)openCreator();
+    this.input.on("pointerdown",p=>{ if(modal)return; const wx=p.worldX, wy=p.worldY, tx=wx/T|0, ty=wy/T|0;
+      const hit=this.ints.find(o=>Math.abs(wx-o.x)<11&&wy>o.y-26&&wy<o.y+8);
+      if(hit&&hit.kind==="npc"&&finding){ if(hit.n.id===finding.target){const f=finding;finding=null;$("find").hidden=true;fb("",1);complete(f);}
+        else toast("Noch nicht. Schau dir die Personen genau an."); return;}
+      if(!finding){const c=(this.crit||[]).find(c=>critHit(c,wx,wy)); if(c){tapAnimal(c.k);return;}}
+      if(hit){ if(Math.hypot(this.pl.x-hit.x,this.pl.y-hit.y)<30) interact(hit); else this.walkNear(tx,ty); return;}
+      if(grid[ty]&&grid[ty][tx]===9){say("",LOCKED_MSG);return;}
+      if(!solidTile(tx,ty)) this.walkTo(tx,ty); });
+  }
+  refreshGates(){ gates.forEach(g=>[14,15].forEach(y=>{const open=doneCount()>=g.need; grid[y][g.x]=open?1:9; this.tiles[y][g.x].setTexture(open?(y===14?"t1t":"t1b"):"t9");})); }
+  setRegion(i,fade){const r=this.REG[i],c=this.cameras.main;c.stopFollow();c.setBounds(r[0],r[1],r[2],r[3]);c.centerOn(this.pl.x,this.pl.y);c.startFollow(this.pl,true,.12,.12);if(fade){c.fadeIn(300);toast(r[4]);}}
+  jumpFish(list){   // a small fish sometimes jumps out of a nearby water tile
+    const pl=this.pl, near=list.filter(w=>deepWater(w)&&Math.abs(w.x-pl.x)<170&&Math.abs(w.y-pl.y)<100); if(!near.length||modal)return;
+    const w=near[Math.random()*near.length|0], dir=Math.random()<.5?-1:1, f=this.add.image(w.x,w.y,"fish").setDepth(9).setFlipX(dir<0);
+    const ring=(x,y)=>{const r=this.add.image(x,y,"ring").setDepth(8);this.tweens.add({targets:r,scale:{from:.15,to:.7},alpha:{from:.9,to:0},duration:500,onComplete:()=>r.destroy()});};
+    ring(w.x,w.y); sfx("plop",Math.max(.3,1-Math.hypot(w.x-pl.x,w.y-pl.y)/200)); this.crit=this.crit||[]; this.crit.push({s:f,k:"fish"});
+    this.tweens.add({targets:f,x:w.x+dir*8,angle:{from:-35*dir,to:35*dir},duration:600});
+    this.tweens.add({targets:f,y:w.y-9,duration:300,yoyo:true,ease:"Quad.easeOut",onComplete:()=>{ring(f.x,f.y);this.crit=this.crit.filter(c=>c.s!==f);f.destroy();}});
+  }
+  ripple(list){   // shallow/narrow water: ripples and a dim fish shadow, always inside its own tile
+    const pl=this.pl, near=list.filter(w=>!deepWater(w)&&Math.abs(w.x-pl.x)<170&&Math.abs(w.y-pl.y)<100); if(!near.length||modal)return;
+    const w=near[Math.random()*near.length|0];
+    sfx("plop",Math.max(.25,1-Math.hypot(w.x-pl.x,w.y-pl.y)/200)*.6);
+    const ring=(d)=>this.time.delayedCall(d,()=>{const r=this.add.image(w.x,w.y,"ring").setDepth(8);this.tweens.add({targets:r,scale:{from:.12,to:.45},alpha:{from:.8,to:0},duration:700,onComplete:()=>r.destroy()});});
+    ring(0); ring(250);
+    if(Math.random()<.5){const f=this.add.image(w.x-3,w.y,"fish").setDepth(9).setTint(0x2a5a8a).setAlpha(0).setFlipX(Math.random()<.5);
+      this.tweens.add({targets:f,x:w.x+3,alpha:.45,duration:700,yoyo:true,onComplete:()=>f.destroy()});}
+  }
+  initAnimals(){
+    const rnd=(a,b)=>a+Math.random()*(b-a);
+    this.walkers=[]; this.crit=[];
+    const addWalker=(key,box,spd,n)=>{for(let i=0;i<n;i++){const w={box,spd,wait:Math.random()*2,x:0,y:0,tx:0,ty:0}; if(!this.pickSpot(w,true))continue;
+      w.s=this.add.sprite(w.x,w.y,key).setOrigin(.5,1).setDepth(w.y); this.walkers.push(w); this.crit.push({s:w.s,k:key});}};
+    addWalker("cat",[3*T,17*T,16*T,27*T],16,1);                  // village meadow
+    addWalker("hen",[22*T,19*T,29*T,24*T],10,3);                 // yard behind the house
+    addWalker("rabbit",[37*T,19*T,46*T,27*T],22,2);              // forest
+    // ducks swim in the middle of the two big ponds (box stays inside the 2x2 deep centre)
+    [[118,138,86,106],[886,906,358,378],[118,138,86,106]].forEach(([x0,x1,y0,y1],i)=>{
+      const d=this.add.image(rnd(x0,x1),rnd(y0,y1),"duck").setDepth(10); this.crit.push({s:d,k:"duck"});
+      const swim=()=>{const nx=rnd(x0,x1), ny=rnd(y0,y1); d.setFlipX(nx<d.x);
+        this.tweens.add({targets:d,x:nx,y:ny,duration:rnd(2500,5000),ease:"Sine.easeInOut",onComplete:()=>this.time.delayedCall(rnd(300,1800),swim)});};
+      this.time.delayedCall(i*700,swim);});
+    // butterflies over the village meadow
+    for(let i=0;i<7;i++){const b=this.add.image(rnd(3*T,33*T),rnd(17*T,27*T),["bfa","bfb","bfc"][i%3]).setDepth(7000); this.crit.push({s:b,k:"butterfly"});
+      this.tweens.add({targets:b,scaleY:{from:1/K,to:.35/K},duration:140,yoyo:true,repeat:-1});
+      const fly=()=>{const nx=Phaser.Math.Clamp(b.x+rnd(-45,45),2*T,34*T), ny=Phaser.Math.Clamp(b.y+rnd(-30,30),16*T,28*T);
+        this.tweens.add({targets:b,x:nx,y:ny,duration:rnd(1500,3200),ease:"Sine.easeInOut",onComplete:fly});};
+      this.time.delayedCall(i*300,fly);}
+    // a bird flies over the village every now and then
+    this.time.addEvent({delay:14000,loop:true,callback:()=>{ if(modal||this.pl.y>=30*T)return;
+      const dir=Math.random()<.5?1:-1, y=this.pl.y-rnd(50,95), x0=this.pl.x-dir*220, b=this.add.image(x0,y,"bird0").setDepth(8200).setFlipX(dir<0);
+      this.crit.push({s:b,k:"bird"}); sfx("chirp",.6); this.time.delayedCall(1800,()=>sfx("chirp",.5)); this.time.delayedCall(3600,()=>sfx("chirp",.4));
+      this.tweens.add({targets:b,x:x0+dir*440,y:y-rnd(-15,15),duration:7000,onUpdate:()=>b.setTexture((this.time.now/140|0)%2?"bird1":"bird0"),onComplete:()=>{this.crit=this.crit.filter(c=>c.s!==b);b.destroy();}});}});
+  }
+  pickSpot(w,init){   // random free spot inside the animal's box
+    for(let i=0;i<40;i++){const x=w.box[0]+Math.random()*(w.box[2]-w.box[0]), y=w.box[1]+Math.random()*(w.box[3]-w.box[1]);
+      if(free(x,y)){ if(init){w.x=x;w.y=y;} w.tx=x;w.ty=y; return true; }}
+    return false;
+  }
+  animalsTick(dt){
+    for(const w of this.walkers){
+      if(w.wait>0){w.wait-=dt;continue;}
+      const dx=w.tx-w.x, dy=w.ty-w.y, d=Math.hypot(dx,dy);
+      if(d<2){w.wait=1+Math.random()*3;this.pickSpot(w);continue;}
+      const m=Math.min(d,w.spd*dt), nx=w.x+dx/d*m, ny=w.y+dy/d*m;
+      if(free(nx,ny)){w.x=nx;w.y=ny;} else {w.wait=.4;this.pickSpot(w);}
+      if(Math.abs(dx)>1)w.s.setFlipX(dx<0);
+      w.s.setPosition(w.x,w.y).setDepth(w.y);
+    }
+  }
+  walkTo(tx,ty){const p=bfs(this.pl.x/T|0,(this.pl.y-2)/T|0,tx,ty); if(p){path=p;const m=this.add.image(tx*T+8,ty*T+8,"ring").setDepth(8500);this.tweens.add({targets:m,scale:{from:.2,to:.9},alpha:{from:1,to:0},duration:450,onComplete:()=>m.destroy()});}}
+  walkNear(tx,ty){for(const [dx,dy] of [[0,1],[1,0],[-1,0],[0,-1]]){const p=bfs(this.pl.x/T|0,(this.pl.y-2)/T|0,tx+dx,ty+dy); if(p){path=p;return;}}}
+  step(dx,dy){let m=false; if(dx&&free(this.pl.x+dx,this.pl.y)){this.pl.x+=dx;m=true;} if(dy&&free(this.pl.x,this.pl.y+dy)){this.pl.y+=dy;m=true;} if(Math.abs(dx)>Math.abs(dy)){this.dir="l";this.pl.flipX=dx>0;}else if(dy){this.dir=dy<0?"u":"d";this.pl.flipX=false;} return m;}
+  update(t,dt){
+    dt/=1000; let mv=false; if(this.walkers)this.animalsTick(Math.min(dt,.1));
+    if(modal){path=[];}
+    else{
+      if(path.length){const p=path[0],ex=p.x-this.pl.x,ey=p.y-this.pl.y,d=Math.hypot(ex,ey);
+        if(d<2)path.shift(); else{const m=Math.min(d,SPD*dt); mv=this.step(ex/d*m,ey/d*m); if(!mv)path=[];}}
+    }
+    if(mv){this.stepT=(this.stepT||0)-dt;if(this.stepT<=0){this.stepT=.3;sfx("step");}}else this.stepT=0;
+    this.pl.setTexture("h_"+(this.dir||"d")+(mv?[0,1,0,2][(t/130|0)%4]:0)).setDepth(this.pl.y); this.psh.setPosition(this.pl.x,this.pl.y-1).setDepth(this.pl.y-1);
+    const P=this.P[(this.pl.x/T|0)+","+((this.pl.y-2)/T|0)];
+    if(P&&!modal){path=[];this.pl.setPosition(P[0]*T+8,P[1]*T+10);this.setRegion(P[2],true);}   // walk through a door -> new map
+    let best=null,bd=28; if(!modal)this.ints.forEach(o=>{ if(o.kind==="npc"&&finding)return; const d=Math.hypot(this.pl.x-o.x,this.pl.y-o.y); if(d<bd){bd=d;best=o;}});
+    if(best!==cur){cur=best;$("act").hidden=!cur;if(cur)$("act").textContent=cur.label;}
+  }
+}
+new Phaser.Game({type:Phaser.AUTO,parent:"game",width:640,height:360,pixelArt:true,backgroundColor:"#1b1530",
+  scale:{mode:Phaser.Scale.FIT,autoCenter:Phaser.Scale.CENTER_BOTH},input:{keyboard:false},scene:Main});
+</script></body></html>
