@@ -367,7 +367,7 @@ if(S.heartVersion!==2){
   S.maxhp=Math.min(BASE_HP+EXTRA_HEARTS,BASE_HP+finds.filter(f=>f.hp&&S.opened[f.tx+","+f.ty]).length);
   S.hp=Math.min(typeof S.hp==="number"?S.hp:S.maxhp,S.maxhp);S.heartVersion=2;
 } else {S.maxhp=Math.min(BASE_HP+EXTRA_HEARTS,Math.max(BASE_HP,typeof S.maxhp==="number"?S.maxhp:BASE_HP));S.hp=typeof S.hp==="number"?Math.min(S.hp,S.maxhp):S.maxhp;}
-const save=()=>{if(window.__gameResetInProgress)return;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const save=()=>{if(window.__gameImportInProgress)return;if(window.__gameResetInProgress)return;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const doneCount=()=>Object.keys(S.done).length;
 // ---- Sound: chip-tune effects + calm looping music, synthesized (square / triangle / noise). S.mute and S.nomusic are saved. ----
 let AC=null;
@@ -1322,4 +1322,40 @@ resetDialog=function(){
  {t:'Abbrechen',f:openMenu,c:'sec'}
  ]);
 };
+
+/* BACKUP_RESTORE_FIX_V1 */
+(function(){
+ function snapshot(){if(S.hero&&!titleOn)S.resumePosition={x:Scene.pl.x,y:Scene.pl.y,region:Scene.region,dir:Scene.dir};}
+ buildBackup=function(){snapshot();return 'DEUTSCH-ABENTEUER-SPIELSTAND v1\n'+btoa(unescape(encodeURIComponent(JSON.stringify(S))))+'\nENDE';};
+ function parseBackup(text){
+  let raw=String(text).replace(/^\uFEFF/,'').trim().replace(/^```[^\n]*\n/,'').replace(/\n```$/,'').trim(),obj;
+  if(raw.startsWith('{'))obj=JSON.parse(raw);
+  else{const match=/DEUTSCH-ABENTEUER-SPIELSTAND\s+v1\s+([\s\S]*?)\s+ENDE/.exec(raw);if(!match)throw new Error('Bitte den vollständigen Spielstand von DEUTSCH-ABENTEUER-SPIELSTAND bis ENDE einfügen. Ein Lehrpersonen-Bericht ist kein Spielstand.');obj=JSON.parse(decodeURIComponent(escape(atob(match[1].replace(/\s/g,'')))));}
+  const record=v=>v&&typeof v==='object'&&!Array.isArray(v);
+  if(!record(obj)||!Number.isFinite(obj.xp)||obj.xp<0||!record(obj.done))throw new Error('Ungültige Spielstand-Daten: XP oder Aufgabenfortschritt fehlen.');
+  for(const key of ['gram','seen','search','opened','q']){if(obj[key]===undefined)obj[key]=key==='q'?{s:0}:{};else if(!record(obj[key]))throw new Error('Ungültiges Feld: '+key);}
+  if(obj.inv===undefined)obj.inv=[];if(!Array.isArray(obj.inv)||!obj.inv.every(v=>typeof v==='string'))throw new Error('Ungültige Wörterliste.');
+  if(obj.hero!==undefined&&!record(obj.hero))throw new Error('Ungültiger Avatar.');
+  if(obj.maxhp!==undefined&&(!Number.isFinite(obj.maxhp)||obj.maxhp<2||obj.maxhp>10))throw new Error('Ungültige maximale Herzanzahl.');
+  if(obj.hp!==undefined&&(!Number.isFinite(obj.hp)||obj.hp<0||obj.hp>(obj.maxhp||10)))throw new Error('Ungültige Herzanzahl.');
+  if(obj.resumePosition){const p=obj.resumePosition;if(!record(p)||!Number.isFinite(p.x)||!Number.isFinite(p.y)||p.x<0||p.y<0||p.x>=W*T||p.y>=H*T||!Number.isInteger(p.region)||!Scene.REG[p.region])throw new Error('Ungültige gespeicherte Position.');}
+  return obj;
+ }
+ restoreBackup=function(text){
+  let obj;try{obj=parseBackup(text);}catch(e){fb('Laden fehlgeschlagen: '+e.message,false);return false;}
+  const previous=S,previousTitle=titleOn;window.__gameImportInProgress=true;
+  try{const data=JSON.stringify(obj);localStorage.setItem(KEY,data);if(localStorage.getItem(KEY)!==data)throw new Error('Der Browser hat den Spielstand nicht gespeichert.');S=obj;titleOn=true;location.reload();return true;}
+  catch(e){S=previous;titleOn=previousTitle;window.__gameImportInProgress=false;fb('Speichern fehlgeschlagen: '+e.message,false);return false;}
+ };
+ openRestore=function(){
+  const ta=document.createElement('textarea');ta.rows=8;ta.placeholder='Vollständigen Spielstand hier einfügen …';ta.setAttribute('aria-label','Spielstand-Text');ta.style.cssText='width:100%;min-height:160px;user-select:text;-webkit-user-select:text';
+  const file=document.createElement('input');file.type='file';file.accept='.txt,.json,text/plain,application/json';file.setAttribute('aria-label','Spielstand-Datei auswählen');file.onchange=async()=>{try{if(file.files[0]){ta.value=await file.files[0].text();fb('Datei eingelesen. Jetzt Spielstand laden wählen.',true);}}catch(e){fb('Datei konnte nicht gelesen werden: '+e.message,false);}};
+  show('Spielstand laden','Text einfügen oder eine gespeicherte TXT-Datei auswählen. Mit Spielstand laden wird dein aktueller Fortschritt ersetzt. Danach im Titelbild WEITER wählen.',[{t:'Spielstand laden',f:()=>{restoreBackup(ta.value);},c:'ok'},{t:'Abbrechen',f:openBackup,c:'sec'}],[ta,file]);
+ };
+ openBackup=function(){
+  const text=buildBackup(),ta=document.createElement('textarea');ta.value=text;ta.rows=8;ta.readOnly=true;ta.style.cssText='width:100%;min-height:160px;user-select:text;-webkit-user-select:text';ta.setAttribute('aria-label','Spielstand zum Kopieren');
+  const link=document.createElement('a'),url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));link.href=url;link.download='deutsch-abenteuer-spielstand.txt';link.textContent='Spielstand als TXT herunterladen';link.style.cssText='display:block;padding:14px;color:#fff;text-decoration:underline';setTimeout(()=>URL.revokeObjectURL(url),600000);
+  show('Spielstand sichern oder laden','Sichern: den gesamten Text kopieren oder die TXT-Datei herunterladen. Laden: Gespeicherten Spielstand laden wählen. Der Text enthält auch den Avatar und seine aktuelle Position.',[{t:'Text kopieren',f:()=>copyText(text,ok=>{if(!ok){ta.focus();ta.select();}fb(ok?'Spielstand kopiert.':'Bitte den markierten Text manuell kopieren.',ok);}),c:'ok'},{t:'Gespeicherten Spielstand laden',f:openRestore},{t:'Zurück',f:openMenu,c:'sec'}],[ta,link]);
+ };
+})();
 </script></body></html>
